@@ -21,6 +21,6 @@ export default async function ExperiencePage({
 	  redirect("/discover");
 	}
   
-	redirect("/lock-in");
+	redirect("/dashboard");
   }
   
