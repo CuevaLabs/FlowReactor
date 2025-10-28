@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveIntake, type IntakeAnswers } from '@/lib/lockin-intake';
-import { getSession, startSession, subscribeSession, type FocusSession } from '@/lib/focus-session';
+import { startSession, useFocusSession } from '@/lib/focus-session';
 
 type StepKey = keyof Pick<
 	IntakeAnswers,
@@ -73,7 +73,7 @@ export default function LockInPage() {
 			return 25;
 		}
 	});
-	const [activeSession, setActiveSession] = useState<FocusSession | null>(null);
+	const activeSession = useFocusSession();
 	const [draftLoaded, setDraftLoaded] = useState<boolean>(false);
 
 	const step = steps[cursor];
@@ -81,9 +81,6 @@ export default function LockInPage() {
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
-
-		const existingSession = getSession();
-		setActiveSession(existingSession);
 
 		try {
 			const draftRaw = window.localStorage.getItem(STORAGE_KEY);
@@ -96,9 +93,6 @@ export default function LockInPage() {
 		} finally {
 			setDraftLoaded(true);
 		}
-
-		const unsubscribe = subscribeSession(() => setActiveSession(getSession()));
-		return () => unsubscribe();
 	}, []);
 
 	useEffect(() => {

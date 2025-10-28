@@ -7,14 +7,7 @@ import {
 	getLog,
 	type SessionLog,
 } from '@/lib/lockin-logs';
-import {
-	endSession,
-	getSession,
-	pauseSession,
-	resumeSession,
-	subscribeSession,
-	type FocusSession,
-} from '@/lib/focus-session';
+import { endSession, pauseSession, resumeSession, useFocusSession } from '@/lib/focus-session';
 
 const formatTime = (secs: number) => {
 	const minutes = Math.floor(secs / 60);
@@ -24,31 +17,20 @@ const formatTime = (secs: number) => {
 
 export default function FocusOverlay() {
 	const router = useRouter();
-	const [session, setSession] = useState<FocusSession | null>(null);
+	const session = useFocusSession();
 	const [now, setNow] = useState<number>(Date.now());
-	const [isPaused, setIsPaused] = useState<boolean>(false);
 	const finishing = useRef<boolean>(false);
 
 	useEffect(() => {
-		const hydrate = () => {
-			const data = getSession();
-			setSession(data);
-			setIsPaused(data?.paused ?? false);
-		};
-
-		hydrate();
-		const unsubscribe = subscribeSession(hydrate);
 		const tick = setInterval(() => setNow(Date.now()), 1000);
-
-		return () => {
-			unsubscribe();
-			clearInterval(tick);
-		};
+		return () => clearInterval(tick);
 	}, []);
 
 	const remaining = useMemo(() => {
 		if (!session) return 0;
-		if (session.paused) return session.remaining ?? 0;
+		if (session.paused) {
+			if (typeof session.remaining === 'number') return Math.max(0, session.remaining);
+		}
 		return Math.max(0, Math.floor((session.endAt - now) / 1000));
 	}, [session, now]);
 
@@ -72,9 +54,8 @@ export default function FocusOverlay() {
 			payload.insights = existing.insights;
 		}
 
-		addOrUpdateLog(payload);
-		endSession();
-		setSession(null);
+	addOrUpdateLog(payload);
+	endSession();
 		setTimeout(() => {
 			router.push(session.intakeId ? `/reflection?sessionId=${session.sessionId}` : '/reflection');
 			finishing.current = false;
@@ -91,7 +72,7 @@ export default function FocusOverlay() {
 						{formatTime(remaining)}
 					</div>
 					<div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">
-						{isPaused ? 'Paused' : 'Active'}
+						{session.paused ? 'Paused' : 'Active'}
 					</div>
 				</div>
 				<div className="min-w-0 flex-1">
@@ -106,15 +87,13 @@ export default function FocusOverlay() {
 					<button
 						type="button"
 						onClick={() => {
-							if (isPaused) resumeSession();
+							if (!session) return;
+							if (session.paused) resumeSession();
 							else pauseSession();
-							const updated = getSession();
-							setSession(updated);
-							setIsPaused(updated?.paused ?? false);
 						}}
 						className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/40"
 					>
-						{isPaused ? 'Resume' : 'Pause'}
+						{session.paused ? 'Resume' : 'Pause'}
 					</button>
 					<button
 						type="button"

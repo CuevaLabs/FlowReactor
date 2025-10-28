@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 export type FocusSession = {
     sessionId: string;
     target: string;
@@ -10,22 +12,22 @@ export type FocusSession = {
 };
 
 const KEY = "focusSession";
-const MEMORY_EVENT = "lockin:session-change";
 
 let memorySession: FocusSession | null = null;
+const listeners = new Set<() => void>();
+
+function notifyAll() {
+    listeners.forEach((listener) => {
+        try {
+            listener();
+        } catch {
+            // ignore listener errors
+        }
+    });
+}
 
 function emitChange() {
-    if (typeof window === "undefined") return;
-    try {
-        window.dispatchEvent(new Event(MEMORY_EVENT));
-    } catch {
-        // ignore dispatch issues
-    }
-    try {
-        window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
-    } catch {
-        // ignore
-    }
+    notifyAll();
 }
 
 export function getSession(): FocusSession | null {
@@ -87,13 +89,26 @@ export function resumeSession() {
 
 export function subscribeSession(callback: () => void) {
     if (typeof window === "undefined") return () => {};
-    const handler = () => callback();
-    window.addEventListener("storage", handler);
-    window.addEventListener(MEMORY_EVENT, handler);
-    return () => {
-        window.removeEventListener("storage", handler);
-        window.removeEventListener(MEMORY_EVENT, handler);
+    listeners.add(callback);
+    const handler = (event: StorageEvent) => {
+        if (!event.key || event.key === KEY) {
+            getSession(); // refresh memory snapshot
+            notifyAll();
+        }
     };
+    window.addEventListener("storage", handler);
+    return () => {
+        listeners.delete(callback);
+        window.removeEventListener("storage", handler);
+    };
+}
+
+export function useFocusSession(): FocusSession | null {
+    return useSyncExternalStore(
+        subscribeSession,
+        () => getSession(),
+        () => memorySession,
+    );
 }
 
 export function cryptoRandomId(): string {
@@ -104,4 +119,3 @@ export function cryptoRandomId(): string {
     // Fallback
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
-

@@ -2,19 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-	addOrUpdateLog,
-	getLog,
-	type SessionLog,
-} from '@/lib/lockin-logs';
-import {
-	endSession,
-	getSession,
-	pauseSession,
-	resumeSession,
-	subscribeSession,
-	type FocusSession,
-} from '@/lib/focus-session';
+import { addOrUpdateLog, getLog, type SessionLog } from '@/lib/lockin-logs';
+import { endSession, pauseSession, resumeSession, useFocusSession } from '@/lib/focus-session';
 import { getIntake } from '@/lib/lockin-intake';
 
 const formatTime = (seconds: number) => {
@@ -23,83 +12,69 @@ const formatTime = (seconds: number) => {
 	return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+const computeRemainingSeconds = (session: ReturnType<typeof useFocusSession>, now: number) => {
+	if (!session) return 0;
+	if (session.paused) {
+		if (typeof session.remaining === 'number') return Math.max(0, session.remaining);
+	}
+	return Math.max(0, Math.floor((session.endAt - now) / 1000));
+};
+
 export default function FocusPage() {
 	const router = useRouter();
-	const [session, setSession] = useState<FocusSession | null>(null);
-	const [remaining, setRemaining] = useState<number>(0);
-	const [initialTotal, setInitialTotal] = useState<number>(0);
-	const [isPaused, setIsPaused] = useState<boolean>(false);
-	const hasRedirected = useRef<boolean>(false);
-
-useEffect(() => {
-	if (typeof window === 'undefined') return;
-
-	const hydrate = () => {
-		const current = getSession();
-		if (!current) {
-			if (!hasRedirected.current) {
-				router.replace('/lock-in');
-				hasRedirected.current = true;
-			}
-			return;
-		}
-
-		const secondsRemaining = Math.max(
-			0,
-			Math.floor((current.endAt - Date.now()) / 1000),
-		);
-
-		setSession(current);
-		setRemaining(current.paused ? current.remaining ?? secondsRemaining : secondsRemaining);
-		setInitialTotal(current.lengthMinutes * 60);
-		setIsPaused(current.paused);
-	};
-
-	hydrate();
-	const unsubscribe = subscribeSession(hydrate);
-
-	const tick = setInterval(() => {
-		setRemaining((prev) => {
-			if (isPaused || !session) return prev;
-			return Math.max(0, prev - 1);
-		});
-	}, 1000);
-
-	return () => {
-		clearInterval(tick);
-		unsubscribe();
-	};
-}, [isPaused, router, session]);
+	const session = useFocusSession();
+	const [now, setNow] = useState(() => Date.now());
+	const hasRedirected = useRef(false);
 
 	useEffect(() => {
-    if (!session || remaining > 0 || isPaused) return;
+		const tick = setInterval(() => setNow(Date.now()), 1000);
+		return () => clearInterval(tick);
+	}, []);
 
-    const existingLog = getLog(session.sessionId);
-    const payload: SessionLog = {
-        sessionId: session.sessionId,
-        intakeId: session.intakeId,
-        target: session.target,
-        startAt: session.startAt,
-        endAt: Date.now(),
-        lengthMinutes: session.lengthMinutes,
-        completed: true,
-    };
+	useEffect(() => {
+		if (session) {
+			hasRedirected.current = false;
+			return;
+		}
+		if (typeof window === 'undefined') return;
+		if (!hasRedirected.current) {
+			hasRedirected.current = true;
+			router.replace('/lock-in');
+		}
+	}, [session, router]);
 
-    if (existingLog?.reflection) {
-        payload.reflection = existingLog.reflection;
-        payload.insights = existingLog.insights;
-    }
+	const secondsRemaining = useMemo(() => computeRemainingSeconds(session, now), [session, now]);
+	const initialTotal = session ? session.lengthMinutes * 60 : 0;
+	const isPaused = session?.paused ?? false;
 
-    addOrUpdateLog(payload);
-    endSession();
+	useEffect(() => {
+		if (!session || session.paused) return;
+		if (secondsRemaining > 0) return;
 
-    if (!hasRedirected.current) {
-        hasRedirected.current = true;
-        setSession(null);
-        setRemaining(0);
-        router.push(session.intakeId ? `/reflection?sessionId=${session.sessionId}` : '/reflection');
-    }
-}, [isPaused, remaining, router, session]);
+		const existingLog = getLog(session.sessionId);
+		const payload: SessionLog = {
+			sessionId: session.sessionId,
+			intakeId: session.intakeId,
+			target: session.target,
+			startAt: session.startAt,
+			endAt: Date.now(),
+			lengthMinutes: session.lengthMinutes,
+			completed: true,
+		};
+
+		if (existingLog?.reflection) {
+			payload.reflection = existingLog.reflection;
+			payload.insights = existingLog.insights;
+		}
+
+		addOrUpdateLog(payload);
+		endSession();
+
+		if (!hasRedirected.current) {
+			hasRedirected.current = true;
+			router.push(session.intakeId ? `/reflection?sessionId=${session.sessionId}` : '/reflection');
+		}
+	}, [session, secondsRemaining, router]);
 
 	if (!session) {
 		return (
@@ -111,10 +86,6 @@ useEffect(() => {
 		);
 	}
 
-	const secondsRemaining = session.paused
-		? session.remaining ?? remaining
-		: remaining;
-
 	const progress = useMemo(() => {
 		if (initialTotal === 0) return 0;
 		const elapsed = Math.max(0, initialTotal - secondsRemaining);
@@ -124,13 +95,13 @@ useEffect(() => {
 	const intake = session.intakeId ? getIntake(session.intakeId) : null;
 
 	const handlePauseToggle = () => {
-		if (isPaused) resumeSession();
+		if (!session) return;
+		if (session.paused) resumeSession();
 		else pauseSession();
-
-		setIsPaused((previous) => !previous);
 	};
 
 	const handleEndEarly = () => {
+		if (!session) return;
 		const payload: SessionLog = {
 			sessionId: session.sessionId,
 			intakeId: session.intakeId,
@@ -162,8 +133,7 @@ useEffect(() => {
 							{session.target}
 						</h1>
 						<p className="mt-2 text-sm text-slate-300">
-							{session.lengthMinutes} minute block • Started{' '}
-							{new Date(session.startAt).toLocaleTimeString()}
+							{session.lengthMinutes} minute block • Started {new Date(session.startAt).toLocaleTimeString()}
 						</p>
 					</div>
 					<div className="flex items-center gap-3">
@@ -210,9 +180,7 @@ useEffect(() => {
 						</div>
 
 						<div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-left">
-							<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
-								Ritual
-							</div>
+							<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Ritual</div>
 							<ul className="mt-3 space-y-2 text-sm text-slate-200">
 								<li className="flex items-start gap-2">
 									<span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400" />
@@ -233,9 +201,7 @@ useEffect(() => {
 					<div className="flex flex-col gap-5">
 						{intake && (
 							<div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
-								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
-									Your Intent
-								</div>
+								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Your Intent</div>
 								<div className="mt-3 space-y-4 text-sm text-slate-200">
 									<div>
 										<div className="text-slate-400">Focus for this sprint</div>
@@ -253,37 +219,35 @@ useEffect(() => {
 							</div>
 						)}
 
-						<div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-							<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
-								Quick Actions
-							</div>
-							<div className="mt-4 flex flex-col gap-3">
-								<button
-									type="button"
-									onClick={() => router.push('/reflection')}
-									className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-								>
-									Jump to Reflection
-								</button>
-								<button
-									type="button"
-									onClick={() => router.push('/logs')}
-									className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-								>
-									Review Past Sessions
-								</button>
-								<button
-									type="button"
-									onClick={() => router.push('/dashboard')}
-									className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-								>
-									Insights Dashboard
-								</button>
-							</div>
+					<div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Quick Actions</div>
+						<div className="mt-4 flex flex-col gap-3">
+							<button
+								type="button"
+								onClick={() => router.push('/reflection')}
+								className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+							>
+								Jump to Reflection
+							</button>
+							<button
+								type="button"
+								onClick={() => router.push('/logs')}
+								className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+							>
+								Review Past Sessions
+							</button>
+							<button
+								type="button"
+								onClick={() => router.push('/dashboard')}
+								className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+							>
+								Insights Dashboard
+							</button>
 						</div>
 					</div>
-				</section>
-			</div>
+				</div>
+			</section>
 		</div>
+	</div>
 	);
 }

@@ -1,27 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSession, type FocusSession } from '@/lib/focus-session';
+import { useFocusSession } from '@/lib/focus-session';
 
 export default function HomePage() {
 	const router = useRouter();
-	const [session, setSession] = useState<FocusSession | null>(null);
-
-	useEffect(() => {
-		if (typeof window === 'undefined') return;
-		setSession(getSession());
-
-		const onStorage = (event: StorageEvent) => {
-			if (!event.key || event.key === 'focusSession') {
-				setSession(getSession());
-			}
-		};
-
-		window.addEventListener('storage', onStorage);
-		return () => window.removeEventListener('storage', onStorage);
-	}, []);
+	const session = useFocusSession();
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-white">
