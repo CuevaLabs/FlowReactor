@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getLog, addOrUpdateLog } from '@/lib/lockin-logs';
 import { getIntake } from '@/lib/lockin-intake';
 
-export default function ReflectionPage() {
+function ReflectionContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const sessionId = searchParams.get('sessionId') ?? '';
@@ -112,4 +112,17 @@ export default function ReflectionPage() {
     );
 }
 
+export default function ReflectionPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="min-h-screen bg-black text-white flex items-center justify-center">
+                    <div className="text-gray-400 text-sm uppercase tracking-widest">Loading reflection...</div>
+                </div>
+            }
+        >
+            <ReflectionContent />
+        </Suspense>
+    );
+}
 
