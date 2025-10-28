@@ -1,6 +1,6 @@
 # 🎨 Customization Guide
 
-This guide will walk you through customizing the Brain Dump app to match your brand and add your own features.
+This guide will walk you through customizing the Lock-In app to match your brand and add your own features.
 
 ## Table of Contents
 
@@ -41,10 +41,11 @@ export const appConfig = {
 
   // Toggle features on/off
   features: {
-    brainDump: true,
-    flowMode: true,
-    breathingReset: true,
-    organize: true,
+    guidedIntake: true,
+    focusShield: true,
+    sessionOverlay: true,
+    reflection: true,
+    insightsDashboard: true,
     analytics: false,    // Set to true when you build this
     aiSuggestions: false, // Set to true when you build this
   },
@@ -293,8 +294,8 @@ To send emails (e.g., daily summaries):
      await resend.emails.send({
        from: "noreply@yourdomain.com",
        to: "user@email.com",
-       subject: "Your Daily Summary",
-       html: "<p>Your brain dump summary...</p>",
+     subject: "Lock-In Daily Summary",
+     html: "<p>Your lock-in highlights and insights...</p>",
      });
 
      return NextResponse.json({ success: true });
@@ -424,4 +425,3 @@ Open an issue on GitHub with:
 ---
 
 **Ready to deploy?** Check out [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step deployment instructions.
-

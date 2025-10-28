@@ -1,7 +1,7 @@
 export type IntakeAnswers = {
     id: string;
     createdAt: number;
-    // We never show raw answers to user later; stored for reflection comparison only
+    // Guided intake prompts captured before every Lock-In session
     q1_mind: string; // what's on your mind right now
     q2_stress: string; // what's been stressing you
     q3_hour_goal: string; // what do you want to accomplish in the next hour
@@ -51,5 +51,4 @@ function randomId(): string {
     }
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
-
 

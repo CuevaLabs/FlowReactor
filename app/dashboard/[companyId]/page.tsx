@@ -1,22 +1,17 @@
-import { whopSdk } from "@/lib/whop-sdk";
-import { headers } from "next/headers";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { whopSdk } from "@/lib/whop-sdk";
 
-export default async function DashboardPage({
+export default async function CompanyDashboard({
 	params,
 }: {
 	params: Promise<{ companyId: string }>;
 }) {
-	// The headers contains the user token
 	const headersList = await headers();
-
-	// The companyId is a path param
 	const { companyId } = await params;
 
-	// The user token is in the headers
 	const { userId } = await whopSdk.verifyUserToken(headersList);
-
-	const result = await whopSdk.access.checkIfUserHasAccessToCompany({
+	const access = await whopSdk.access.checkIfUserHasAccessToCompany({
 		userId,
 		companyId,
 	});
@@ -24,149 +19,80 @@ export default async function DashboardPage({
 	const user = await whopSdk.users.getUser({ userId });
 	const company = await whopSdk.companies.getCompany({ companyId });
 
-	// Either: 'admin' | 'no_access';
-	// 'admin' means the user is an admin of the company, such as an owner or moderator
-	// 'no_access' means the user is not an authorized member of the company
-	const { accessLevel } = result;
-
 	return (
-		<div className="min-h-screen bg-black text-white">
-			{/* Header */}
-			<div className="border-b border-gray-800 p-4">
-				<div className="max-w-6xl mx-auto">
-					<h1 className="text-2xl font-bold mb-2">Brain Dump Dashboard</h1>
-					<p className="text-gray-400">
-						Welcome back, {user.name}! Manage your cognitive load and maintain flow state.
-					</p>
-				</div>
-			</div>
-
-			<div className="max-w-6xl mx-auto p-4">
-				{/* Quick Actions */}
-				<div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-					<Link
-						href="/brain-dump"
-						className="bg-green-900/20 border border-green-500 rounded-lg p-6 hover:bg-green-900/30 transition-colors"
-					>
-						<div className="text-center">
-							<div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-								<span className="text-2xl">🧠</span>
-							</div>
-							<h3 className="font-bold text-green-400 mb-2">Brain Dump</h3>
-							<p className="text-sm text-gray-400">Clear mental clutter</p>
-						</div>
-					</Link>
-
-					<Link
-						href="/flow"
-						className="bg-blue-900/20 border border-blue-500 rounded-lg p-6 hover:bg-blue-900/30 transition-colors"
-					>
-						<div className="text-center">
-							<div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-								<span className="text-2xl">⚡</span>
-							</div>
-							<h3 className="font-bold text-blue-400 mb-2">Flow Mode</h3>
-							<p className="text-sm text-gray-400">Enter focused work</p>
-						</div>
-					</Link>
-
-					<Link
-						href="/reset"
-						className="bg-purple-900/20 border border-purple-500 rounded-lg p-6 hover:bg-purple-900/30 transition-colors"
-					>
-						<div className="text-center">
-							<div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-								<span className="text-2xl">🧘</span>
-							</div>
-							<h3 className="font-bold text-purple-400 mb-2">Reset</h3>
-							<p className="text-sm text-gray-400">Breathing exercise</p>
-						</div>
-					</Link>
-
-					<Link
-						href="/organize"
-						className="bg-yellow-900/20 border border-yellow-500 rounded-lg p-6 hover:bg-yellow-900/30 transition-colors"
-					>
-						<div className="text-center">
-							<div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4">
-								<span className="text-2xl">📋</span>
-							</div>
-							<h3 className="font-bold text-yellow-400 mb-2">Organize</h3>
-							<p className="text-sm text-gray-400">Categorize thoughts</p>
-						</div>
-					</Link>
-				</div>
-
-				{/* Cognitive Load Maintenance */}
-				<div className="bg-gray-900 rounded-lg p-6 mb-8">
-					<h2 className="text-xl font-bold mb-4">Cognitive Load Maintenance</h2>
-					<div className="grid md:grid-cols-3 gap-6">
-						<div>
-							<h3 className="font-semibold text-green-400 mb-2">Daily Reset</h3>
-							<p className="text-sm text-gray-400 mb-4">
-								Perform the Mental RAM Reset daily to maintain optimal cognitive performance.
-							</p>
-							<div className="space-y-2">
-								<div className="flex items-center text-sm">
-									<span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-									<span>Clear working memory</span>
-								</div>
-								<div className="flex items-center text-sm">
-									<span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-									<span>Close open loops</span>
-								</div>
-								<div className="flex items-center text-sm">
-									<span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-									<span>Eliminate need to remember</span>
-								</div>
-							</div>
-						</div>
-
-						<div>
-							<h3 className="font-semibold text-blue-400 mb-2">Flow Sessions</h3>
-							<p className="text-sm text-gray-400 mb-4">
-								Track your focused work sessions and flow state achievements.
-							</p>
-							<div className="text-2xl font-bold text-blue-400 mb-2">0</div>
-							<div className="text-sm text-gray-400">Sessions today</div>
-						</div>
-
-						<div>
-							<h3 className="font-semibold text-purple-400 mb-2">Mental Clarity</h3>
-							<p className="text-sm text-gray-400 mb-4">
-								Monitor your cognitive load and stress levels throughout the day.
-							</p>
-							<div className="text-2xl font-bold text-purple-400 mb-2">Optimal</div>
-							<div className="text-sm text-gray-400">Current state</div>
-						</div>
+		<div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-white">
+			<div className="mx-auto w-full max-w-6xl px-6 py-12 sm:px-10 lg:px-14">
+				<header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+					<div>
+						<div className="text-xs uppercase tracking-[0.3em] text-cyan-200">Lock-In Admin</div>
+						<h1 className="mt-3 text-4xl font-semibold text-white">{company.title}</h1>
+						<p className="mt-2 max-w-2xl text-base text-slate-300">
+							Welcome back, {user.name}. Review member access and direct your community toward deep focus sessions.
+						</p>
 					</div>
-				</div>
+					<span className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-slate-200">
+						Access level: {access.accessLevel}
+					</span>
+				</header>
 
-				{/* Recent Activity */}
-				<div className="bg-gray-900 rounded-lg p-6">
-					<h2 className="text-xl font-bold mb-4">Recent Activity</h2>
-					<div className="space-y-4">
-						<div className="flex items-center justify-between py-2 border-b border-gray-800">
-							<div className="flex items-center">
-								<div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-								<span className="text-sm">Welcome to Brain Dump!</span>
-							</div>
-							<span className="text-xs text-gray-400">Just now</span>
-						</div>
-						<div className="text-center py-8 text-gray-500">
-							<p>Complete your first brain dump to see activity here</p>
-						</div>
-					</div>
-				</div>
+				<section className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+					<Link
+						href="/lock-in"
+						className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/30"
+					>
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Guide</div>
+						<div className="mt-3 text-xl font-semibold text-white">Start Lock-In</div>
+						<p className="mt-2 text-sm text-slate-300">Lead creators through intention, stress, and guardrails.</p>
+					</Link>
+					<Link
+						href="/focus"
+						className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/30"
+					>
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Sprint</div>
+						<div className="mt-3 text-xl font-semibold text-white">Resume Focus</div>
+						<p className="mt-2 text-sm text-slate-300">Drop directly into the active lock-in session.</p>
+					</Link>
+					<Link
+						href="/logs"
+						className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/30"
+					>
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Archive</div>
+						<div className="mt-3 text-xl font-semibold text-white">Session Logs</div>
+						<p className="mt-2 text-sm text-slate-300">Review reflection summaries and completion streaks.</p>
+					</Link>
+					<Link
+						href="/dashboard"
+						className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/30"
+					>
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Insights</div>
+						<div className="mt-3 text-xl font-semibold text-white">Personal Dashboard</div>
+						<p className="mt-2 text-sm text-slate-300">View guided answers and patterns of your focus practice.</p>
+					</Link>
+				</section>
 
-				{/* User Info */}
-				<div className="mt-8 p-4 bg-gray-800 rounded-lg">
-					<div className="text-sm text-gray-400">
-						<p>User: <strong className="text-white">{user.name}</strong> (@{user.username})</p>
-						<p>Company: <strong className="text-white">{company.title}</strong></p>
-						<p>Access Level: <strong className="text-white">{accessLevel}</strong></p>
+				<section className="mt-12 grid gap-6 lg:grid-cols-3">
+					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Community Tips</div>
+						<ul className="mt-4 space-y-2 text-sm text-slate-300">
+							<li>Encourage members to capture a Lock-In before co-working calls.</li>
+							<li>Share guardrail best practices to reduce distraction triggers.</li>
+							<li>Use reflections to celebrate specific shipped outcomes.</li>
+						</ul>
 					</div>
-				</div>
+					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Your Profile</div>
+						<p className="mt-4 text-sm text-slate-300">
+							<span className="font-semibold text-white">{user.name}</span> (@{user.username})
+						</p>
+						<p className="mt-2 text-sm text-slate-300">Company ID: {companyId}</p>
+					</div>
+					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Access Notes</div>
+						<p className="mt-4 text-sm text-slate-300">
+							Users marked as <span className="font-semibold text-white">admin</span> can manage company level integrations and lock-in experiences.
+						</p>
+					</div>
+				</section>
 			</div>
 		</div>
 	);

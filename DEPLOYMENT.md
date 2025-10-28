@@ -298,10 +298,10 @@ Before launching to real customers:
    ```
    Clear your mind and unlock flow state with [Your App Name].
    
-   ✨ Instantly dump mental clutter
-   ⚡ Achieve deep focus faster
-   🎯 Boost productivity
-   🧘 Reduce stress
+   ✨ Capture scattered thoughts with a guided intake
+   ⚡ Stay locked in with a persistent timer and shield
+   🎯 Reflect on progress with alignment insights
+   🧘 Reduce stress by creating intentional guardrails
    
    Perfect for content creators, entrepreneurs, and anyone
    who wants to maintain peak mental performance.
@@ -321,13 +321,13 @@ Before launching to real customers:
 
 **What to say:**
 ```
-🧠 Just launched [Your App Name]!
+🚀 Just launched [Your App Name]!
 
-Help your brain work smarter, not harder.
+Give your focus a ritual and keep the session alive.
 
-✅ Clear mental clutter in seconds
-✅ Achieve flow state faster
-✅ Reduce decision fatigue
+✅ Guided prep to set intent and guardrails
+✅ Timer persists across tabs and devices
+✅ Reflection dashboard to learn from every sprint
 
 [Link to your Whop product]
 ```
@@ -440,4 +440,3 @@ Your app is now deployed and ready to make money!
 ---
 
 **Questions?** Open an issue on GitHub or check the main [README.md](README.md)
-

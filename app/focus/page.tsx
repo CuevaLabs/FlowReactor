@@ -1,36 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSession, pauseSession, resumeSession, endSession, type FocusSession } from '@/lib/focus-session';
-import { addOrUpdateLog } from '@/lib/lockin-logs';
-
-type SessionPhase = 'select' | 'focus' | 'complete';
-
-interface Suggestion {
-	id: string;
-	text: string;
-}
-
-const parseBrainDump = (content: string): Suggestion[] => {
-	const segments: string[] = [];
-	content
-		.split(/\r?\n/)
-		.map((line) => line.split(/[.!?]/))
-		.forEach((lineSegments) => {
-			lineSegments.forEach((segment) => {
-				const trimmed = segment.trim();
-				if (trimmed.length > 3) {
-					segments.push(trimmed);
-				}
-			});
-		});
-
-	return segments.map((text, index) => ({
-		id: `entry-${index}`,
-		text,
-	}));
-};
+import {
+	addOrUpdateLog,
+	getLog,
+	type SessionLog,
+} from '@/lib/lockin-logs';
+import {
+	endSession,
+	getSession,
+	pauseSession,
+	resumeSession,
+	type FocusSession,
+} from '@/lib/focus-session';
+import { getIntake } from '@/lib/lockin-intake';
 
 const formatTime = (seconds: number) => {
 	const mins = Math.floor(seconds / 60);
@@ -38,319 +22,271 @@ const formatTime = (seconds: number) => {
 	return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-export default function FocusSessionPage() {
-    const router = useRouter();
-	const [phase, setPhase] = useState<SessionPhase>('select');
-	const [entries, setEntries] = useState<Suggestion[]>([]);
-	const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
-	const [customFocus, setCustomFocus] = useState('');
-	const [sessionLength, setSessionLength] = useState(25);
-	const [timeRemaining, setTimeRemaining] = useState(sessionLength * 60);
-	const [isPaused, setIsPaused] = useState(false);
-	const [focusTarget, setFocusTarget] = useState<string | null>(null);
-    const [currentSession, setCurrentSession] = useState<FocusSession | null>(null);
+export default function FocusPage() {
+	const router = useRouter();
+	const [session, setSession] = useState<FocusSession | null>(null);
+	const [remaining, setRemaining] = useState<number>(0);
+	const [initialTotal, setInitialTotal] = useState<number>(0);
+	const [isPaused, setIsPaused] = useState<boolean>(false);
+	const hasRedirected = useRef<boolean>(false);
 
-	const targetPreview = useMemo(() => {
-		const custom = customFocus.trim();
-		if (custom.length > 0) {
-			return custom;
-		}
-		if (selectedEntryId) {
-			const match = entries.find((entry) => entry.id === selectedEntryId);
-			return match ? match.text : '';
-		}
-		return '';
-	}, [customFocus, selectedEntryId, entries]);
-
-	const progressPercent = useMemo(() => {
-		const total = sessionLength * 60;
-		if (phase !== 'focus' && phase !== 'complete') {
-			return 0;
-		}
-		return total === 0 ? 0 : Math.min(100, ((total - timeRemaining) / total) * 100);
-	}, [phase, sessionLength, timeRemaining]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        // If a global session exists (from Lock-In), attach to it
-        const s = getSession();
-        if (s) {
-            setCurrentSession(s);
-            setFocusTarget(s.target);
-            setSessionLength(s.lengthMinutes);
-            setIsPaused(s.paused);
-            setPhase('focus');
-            setTimeRemaining(Math.max(0, Math.floor((s.endAt - Date.now()) / 1000)));
-        } else {
-            // No active session; route to Lock-In flow to prepare
-            router.replace('/lock-in');
-            return;
-        }
-
-        const onStorage = (e: StorageEvent) => {
-            if (!e.key || e.key === 'focusSession') {
-                const next = getSession();
-                setCurrentSession(next);
-                if (next) {
-                    setIsPaused(next.paused);
-                    setFocusTarget(next.target);
-                    setSessionLength(next.lengthMinutes);
-                    setTimeRemaining(Math.max(0, Math.floor((next.endAt - Date.now()) / 1000)));
-                }
-            }
-        };
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
-    }, [router]);
-
-    // When driven by global session, update remaining every second if not paused
-    useEffect(() => {
-        if (phase !== 'focus' || isPaused) {
-            return;
-        }
-        const tick = setInterval(() => {
-            setTimeRemaining((prev) => {
-                const next = Math.max(0, prev - 1);
-                if (next === 0) {
-                    clearInterval(tick);
-                    setPhase('complete');
-                    // Log completion using currentSession snapshot
-                    if (currentSession) {
-                        addOrUpdateLog({
-                            sessionId: currentSession.sessionId,
-                            intakeId: currentSession.intakeId,
-                            target: currentSession.target,
-                            startAt: currentSession.startAt,
-                            endAt: Date.now(),
-                            lengthMinutes: currentSession.lengthMinutes,
-                            completed: true,
-                        });
-                    }
-                }
-                return next;
-            });
-        }, 1000);
-        return () => clearInterval(tick);
-    }, [phase, isPaused, currentSession]);
-
-	// Persist preferred session length
 	useEffect(() => {
-		if (typeof window !== 'undefined') {
-			localStorage.setItem('focusSessionLength', sessionLength.toString());
+		if (typeof window === 'undefined') return;
+
+		const hydrate = () => {
+			const current = getSession();
+			if (!current) {
+				if (!hasRedirected.current) {
+					router.replace('/lock-in');
+					hasRedirected.current = true;
+				}
+				return;
+			}
+
+			const secondsRemaining = Math.max(
+				0,
+				Math.floor((current.endAt - Date.now()) / 1000),
+			);
+
+			setSession(current);
+			setRemaining(current.paused ? current.remaining ?? secondsRemaining : secondsRemaining);
+			setInitialTotal(current.lengthMinutes * 60);
+			setIsPaused(current.paused);
+		};
+
+		hydrate();
+
+		const tick = setInterval(() => {
+			setRemaining((prev) => {
+				if (isPaused || !session) return prev;
+				return Math.max(0, prev - 1);
+			});
+		}, 1000);
+
+		const onStorage = (event: StorageEvent) => {
+			if (!event.key || event.key === 'focusSession') hydrate();
+		};
+
+		window.addEventListener('storage', onStorage);
+
+		return () => {
+			clearInterval(tick);
+			window.removeEventListener('storage', onStorage);
+		};
+	}, [isPaused, router, session]);
+
+	useEffect(() => {
+		if (!session || remaining > 0 || isPaused) return;
+
+		const existingLog = getLog(session.sessionId);
+		const payload: SessionLog = {
+			sessionId: session.sessionId,
+			intakeId: session.intakeId,
+			target: session.target,
+			startAt: session.startAt,
+			endAt: Date.now(),
+			lengthMinutes: session.lengthMinutes,
+			completed: true,
+		};
+
+		if (existingLog?.reflection) {
+			payload.reflection = existingLog.reflection;
+			payload.insights = existingLog.insights;
 		}
-	}, [sessionLength]);
 
-    const handleStart = () => {
-        // no-op: Focus sessions are started from /lock-in
-    };
+	addOrUpdateLog(payload);
+	endSession();
 
-    const handlePauseToggle = () => {
-        setIsPaused((prev) => {
-            const next = !prev;
-            if (next) pauseSession(); else resumeSession();
-            return next;
-        });
-    };
+	if (!hasRedirected.current) {
+		hasRedirected.current = true;
+		setSession(null);
+		setRemaining(0);
+		router.push(session.intakeId ? `/reflection?sessionId=${session.sessionId}` : '/reflection');
+	}
+}, [isPaused, remaining, router, session]);
 
-    const handleEndEarly = () => {
-        setPhase('complete');
-        setIsPaused(true);
-        if (currentSession) {
-            addOrUpdateLog({
-                sessionId: currentSession.sessionId,
-                intakeId: currentSession.intakeId,
-                target: currentSession.target,
-                startAt: currentSession.startAt,
-                endAt: Date.now(),
-                lengthMinutes: currentSession.lengthMinutes,
-                completed: false,
-            });
-        }
-        endSession();
-    };
-
-	const handleRestartSelection = () => {
-		setPhase('select');
-		setIsPaused(false);
-		setFocusTarget(null);
-		setSelectedEntryId(null);
-		setCustomFocus('');
-		setTimeRemaining(sessionLength * 60);
-	};
-
-    const handleBackToDump = () => {
-        router.push('/lock-in');
-    };
-
-    const handleReflection = () => {
-        if (currentSession) {
-            router.push(`/reflection?sessionId=${currentSession.sessionId}`);
-        } else {
-            router.push('/reflection');
-        }
-    };
-
-    if (phase === 'select') {
-        return (
-            <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-                <div className="max-w-xl text-center space-y-6">
-                    <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mx-auto">
-                        <span className="text-4xl">⚡</span>
-                    </div>
-                    <h1 className="text-3xl font-bold">Redirecting to Lock-In…</h1>
-                    <p className="text-lg text-gray-400">
-                        We&apos;ll guide you through a quick setup and start the timer.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-	return (
-		<div className="min-h-screen bg-black text-white">
-			{/* Header */}
-			<div className="border-b border-gray-800 p-4">
-				<div className="max-w-4xl mx-auto flex justify-between items-center">
-					<div>
-						<h1 className="text-2xl font-bold">
-							{phase === 'focus' ? 'Focused Sprint' : 'Sprint Launcher'}
-						</h1>
-						<p className="text-gray-400">
-							{phase === 'focus'
-								? 'Block distractions and stay with what matters.'
-								: 'Pick a target and run a Pomodoro-style work block.'}
-						</p>
-					</div>
-					<div className="text-right">
-						<div className="text-3xl font-mono font-bold text-green-400">
-							{formatTime(timeRemaining)}
-						</div>
-                        <div className="text-sm text-gray-400">{isPaused ? 'Paused' : 'Time Remaining'}</div>
-					</div>
+	if (!session) {
+		return (
+			<div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-slate-200">
+				<div className="text-sm uppercase tracking-[0.3em] text-slate-400">
+					Preparing your sprint...
 				</div>
 			</div>
+		);
+	}
 
-			<div className="max-w-4xl mx-auto p-4">
-				{phase === 'focus' && focusTarget && (
-					<div className="py-16 space-y-10 text-center">
-						<section className="space-y-4">
-							<h2 className="text-3xl font-bold">Protect your attention</h2>
-							<p className="text-lg text-gray-400 max-w-2xl mx-auto">
-								Stay with this one thread. Capture distractions elsewhere and let them wait.
-							</p>
-						</section>
+	const secondsRemaining = session.paused
+		? session.remaining ?? remaining
+		: remaining;
 
-						<section className="bg-gray-900 border border-gray-800 rounded-lg p-6 max-w-3xl mx-auto">
-							<h3 className="text-sm uppercase tracking-widest text-gray-500 mb-2">
-								Focus target
-							</h3>
-							<p className="text-xl text-gray-100 leading-relaxed">{focusTarget}</p>
-						</section>
+	const progress = useMemo(() => {
+		if (initialTotal === 0) return 0;
+		const elapsed = Math.max(0, initialTotal - secondsRemaining);
+		return Math.min(100, Math.round((elapsed / initialTotal) * 100));
+	}, [initialTotal, secondsRemaining]);
 
-						<section className="flex flex-col items-center gap-6">
-							<div className="relative w-64 h-64">
-								<svg className="w-64 h-64 transform -rotate-90" viewBox="0 0 100 100">
-									<circle
-										cx="50"
-										cy="50"
-										r="40"
-										stroke="currentColor"
-										strokeWidth="8"
-										fill="none"
-										className="text-gray-900"
+	const intake = session.intakeId ? getIntake(session.intakeId) : null;
+
+	const handlePauseToggle = () => {
+		if (isPaused) resumeSession();
+		else pauseSession();
+
+		setIsPaused((previous) => !previous);
+	};
+
+	const handleEndEarly = () => {
+		const payload: SessionLog = {
+			sessionId: session.sessionId,
+			intakeId: session.intakeId,
+			target: session.target,
+			startAt: session.startAt,
+			endAt: Date.now(),
+			lengthMinutes: session.lengthMinutes,
+			completed: false,
+		};
+
+		addOrUpdateLog(payload);
+		endSession();
+
+		if (!hasRedirected.current) {
+			hasRedirected.current = true;
+			router.push('/reflection');
+		}
+	};
+
+	return (
+		<div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-white">
+			<div className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-12 sm:px-10 lg:px-12">
+				<header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+					<div>
+						<div className="text-xs uppercase tracking-[0.3em] text-cyan-200">
+							Locked-In Sprint
+						</div>
+						<h1 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
+							{session.target}
+						</h1>
+						<p className="mt-2 text-sm text-slate-300">
+							{session.lengthMinutes} minute block • Started{' '}
+							{new Date(session.startAt).toLocaleTimeString()}
+						</p>
+					</div>
+					<div className="flex items-center gap-3">
+						<button
+							type="button"
+							onClick={handlePauseToggle}
+							className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+								isPaused
+									? 'bg-cyan-400 text-slate-900 shadow-lg shadow-cyan-400/40 hover:bg-cyan-300'
+									: 'border border-white/20 text-slate-200 hover:border-white/40'
+							}`}
+						>
+							{isPaused ? 'Resume' : 'Pause'}
+						</button>
+						<button
+							type="button"
+							onClick={handleEndEarly}
+							className="rounded-full border border-red-400/60 px-5 py-2 text-sm font-semibold text-red-200 transition hover:border-red-300 hover:text-red-100"
+						>
+							End Early
+						</button>
+					</div>
+				</header>
+
+				<section className="grid gap-8 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-lg lg:grid-cols-[1.2fr_0.8fr] lg:p-10">
+					<div className="flex flex-col justify-between gap-8">
+						<div className="relative flex flex-col items-center justify-center rounded-3xl border border-cyan-400/30 bg-slate-950/60 px-6 py-10 text-center shadow-inner shadow-black/40">
+							<div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-cyan-500/10 via-transparent to-indigo-500/10" />
+							<div className="text-sm uppercase tracking-[0.3em] text-cyan-200">
+								Time Remaining
+							</div>
+							<div className="mt-6 text-6xl font-semibold tracking-tight text-white sm:text-7xl">
+								{formatTime(secondsRemaining)}
+							</div>
+							<div className="mt-4 flex w-full items-center gap-3 text-sm text-slate-300">
+								<div className="flex-1 rounded-full bg-slate-800/60">
+									<div
+										className="h-2 rounded-full bg-cyan-400 transition-all"
+										style={{ width: `${progress}%` }}
 									/>
-									<circle
-										cx="50"
-										cy="50"
-										r="40"
-										stroke="currentColor"
-										strokeWidth="8"
-										fill="none"
-										strokeDasharray={`${2 * Math.PI * 40}`}
-										strokeDashoffset={`${2 * Math.PI * 40 * (1 - progressPercent / 100)}`}
-										className="text-green-500 transition-all duration-1000"
-									/>
-								</svg>
-								<div className="absolute inset-0 flex items-center justify-center">
+								</div>
+								<div className="w-12 text-right tabular-nums text-cyan-100">{progress}%</div>
+							</div>
+						</div>
+
+						<div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-left">
+							<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+								Ritual
+							</div>
+							<ul className="mt-3 space-y-2 text-sm text-slate-200">
+								<li className="flex items-start gap-2">
+									<span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400" />
+									Breathe in for 4, hold 4, out 6 to drop into focus.
+								</li>
+								<li className="flex items-start gap-2">
+									<span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400" />
+									Close or snooze anything outside today’s target.
+								</li>
+								<li className="flex items-start gap-2">
+									<span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400" />
+									Check alignment halfway and adjust without judgment.
+								</li>
+							</ul>
+						</div>
+					</div>
+
+					<div className="flex flex-col gap-5">
+						{intake && (
+							<div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
+								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+									Your Intent
+								</div>
+								<div className="mt-3 space-y-4 text-sm text-slate-200">
 									<div>
-										<div className="text-5xl font-mono font-bold text-green-400">
-											{formatTime(timeRemaining)}
-										</div>
-										<div className="text-sm text-gray-500 mt-2">
-											{isPaused ? 'Paused' : 'Stay with it'}
-										</div>
+										<div className="text-slate-400">Focus for this sprint</div>
+										<p className="mt-1 text-base text-white">{intake.q3_hour_goal || intake.q4_definition}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">Potential distractions</div>
+										<p className="mt-1">{intake.q5_distractions}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">Guardrails you set</div>
+										<p className="mt-1">{intake.q6_avoid_plan}</p>
 									</div>
 								</div>
 							</div>
-							<div className="flex gap-3">
+						)}
+
+						<div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+							<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
+								Quick Actions
+							</div>
+							<div className="mt-4 flex flex-col gap-3">
 								<button
-									onClick={handlePauseToggle}
-									className="px-5 py-3 rounded-lg border border-gray-700 text-gray-200 hover:border-gray-500 transition-colors"
 									type="button"
+									onClick={() => router.push('/reflection')}
+									className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
 								>
-									{isPaused ? 'Resume' : 'Pause'}
+									Jump to Reflection
 								</button>
 								<button
-									onClick={handleEndEarly}
-									className="px-5 py-3 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors"
 									type="button"
+									onClick={() => router.push('/logs')}
+									className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
 								>
-									End Early
+									Review Past Sessions
+								</button>
+								<button
+									type="button"
+									onClick={() => router.push('/dashboard')}
+									className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+								>
+									Insights Dashboard
 								</button>
 							</div>
-						</section>
-					</div>
-				)}
-
-				{phase === 'complete' && (
-					<div className="py-16 text-center space-y-8">
-						<div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto">
-							<span className="text-4xl">✨</span>
-						</div>
-						<h2 className="text-3xl font-bold">Sprint complete</h2>
-						<p className="text-lg text-gray-400 max-w-2xl mx-auto">
-							Capture what surfaced, note any new tasks, and consciously close the loop before you move on.
-						</p>
-
-						<div className="bg-gray-900 border border-gray-800 rounded-lg p-6 max-w-2xl mx-auto text-left space-y-3">
-							<h3 className="text-sm uppercase tracking-widest text-gray-500">
-								What just happened
-							</h3>
-							<ul className="space-y-2 text-gray-200">
-								<li>&bull; You gave {sessionLength} minutes of deep focus to {focusTarget ?? 'your target'}.</li>
-								<li>&bull; Your brain is primed for a quick reflection to release residue.</li>
-								<li>&bull; The breathing reset is ready whenever you are.</li>
-							</ul>
-						</div>
-
-						<div className="space-y-3">
-							<button
-								onClick={handleReflection}
-								className="bg-white text-black font-bold py-4 px-8 rounded-lg text-xl hover:bg-gray-100 transition-colors"
-								type="button"
-							>
-								Capture Post-Sprint Reflection
-							</button>
-							<button
-								onClick={handleRestartSelection}
-								className="block mx-auto text-gray-400 hover:text-white transition-colors"
-								type="button"
-							>
-								Run another sprint
-							</button>
-							<button
-								onClick={handleBackToDump}
-								className="block mx-auto text-gray-500 hover:text-white transition-colors text-sm"
-								type="button"
-							>
-								Start fresh with a new dump
-							</button>
 						</div>
 					</div>
-				)}
+				</section>
 			</div>
 		</div>
 	);

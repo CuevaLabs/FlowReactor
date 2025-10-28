@@ -19,18 +19,19 @@ export const appConfig = {
 
 	// Theme Colors (Tailwind classes)
 	theme: {
-		primary: "green",
-		secondary: "blue",
-		accent: "purple",
-		warning: "yellow",
+		primary: "cyan",
+		secondary: "indigo",
+		accent: "emerald",
+		warning: "amber",
 	},
 
 	// Feature Toggles
 	features: {
-		brainDump: true,
-		flowMode: true,
-		breathingReset: true,
-		organize: true,
+		guidedIntake: true,
+		focusShield: true,
+		sessionOverlay: true,
+		reflection: true,
+		insightsDashboard: true,
 		analytics: false, // Coming soon
 		aiSuggestions: false, // Coming soon
 	},
@@ -39,18 +40,18 @@ export const appConfig = {
 	pricing: {
 		tiers: [
 			{
-				name: "Basic",
-				price: 9.99,
-				features: ["Brain Dump", "Flow Timer", "Basic Analytics"],
+				name: "Starter",
+				price: 12,
+				features: ["Guided Lock-In", "Persistent Timer", "Reflection Journal"],
 			},
 			{
-				name: "Pro",
-				price: 19.99,
+				name: "Studio",
+				price: 24,
 				features: [
-					"Everything in Basic",
-					"Advanced Analytics",
-					"AI Suggestions",
-					"Custom Categories",
+					"Everything in Starter",
+					"Focus Shield Controls",
+					"Insight Dashboard",
+					"Team Ritual Templates",
 				],
 			},
 		],
@@ -66,4 +67,3 @@ export const appConfig = {
 };
 
 export default appConfig;
-
