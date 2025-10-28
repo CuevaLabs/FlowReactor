@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { addOrUpdateLog, getLog, type SessionLog } from '@/lib/lockin-logs';
-import { endSession, pauseSession, resumeSession, useFocusSession } from '@/lib/focus-session';
+import { endSession, useFocusSession } from '@/lib/focus-session';
 import { getIntake } from '@/lib/lockin-intake';
 
 const formatTime = (seconds: number) => {
@@ -14,8 +14,8 @@ const formatTime = (seconds: number) => {
 
 const computeRemainingSeconds = (session: ReturnType<typeof useFocusSession>, now: number) => {
 	if (!session) return 0;
-	if (session.paused) {
-		if (typeof session.remaining === 'number') return Math.max(0, session.remaining);
+	if (session.paused && typeof session.remaining === 'number') {
+		return Math.max(0, session.remaining);
 	}
 	return Math.max(0, Math.floor((session.endAt - now) / 1000));
 };
@@ -45,7 +45,6 @@ export default function FocusPage() {
 
 	const secondsRemaining = useMemo(() => computeRemainingSeconds(session, now), [session, now]);
 	const initialTotal = session ? session.lengthMinutes * 60 : 0;
-	const isPaused = session?.paused ?? false;
 
 	useEffect(() => {
 		if (!session || session.paused) return;
@@ -94,12 +93,6 @@ export default function FocusPage() {
 
 	const intake = session.intakeId ? getIntake(session.intakeId) : null;
 
-	const handlePauseToggle = () => {
-		if (!session) return;
-		if (session.paused) resumeSession();
-		else pauseSession();
-	};
-
 	const handleEndEarly = () => {
 		if (!session) return;
 		const payload: SessionLog = {
@@ -121,133 +114,118 @@ export default function FocusPage() {
 		}
 	};
 
+	const endTime = new Date(session.endAt).toLocaleTimeString();
+
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-white">
-			<div className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-12 sm:px-10 lg:px-12">
-				<header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+		<div className="relative min-h-screen overflow-hidden bg-[#020617] text-white">
+			<div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.15),transparent_55%),radial-gradient(circle_at_bottom,_rgba(99,102,241,0.18),transparent_50%)]" />
+			<div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 sm:px-12">
+				<header className="flex flex-col gap-6 pt-4 md:flex-row md:items-start md:justify-between">
 					<div>
-						<div className="text-xs uppercase tracking-[0.3em] text-cyan-200">
-							Locked-In Sprint
-						</div>
-						<h1 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
-							{session.target}
-						</h1>
-						<p className="mt-2 text-sm text-slate-300">
-							{session.lengthMinutes} minute block • Started {new Date(session.startAt).toLocaleTimeString()}
+						<div className="text-xs uppercase tracking-[0.35em] text-slate-400">Locked-In Sprint</div>
+						<h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">{session.target}</h1>
+						<p className="mt-3 text-sm text-slate-300">
+							{session.lengthMinutes} minute lock • Ends {endTime}
 						</p>
 					</div>
-					<div className="flex items-center gap-3">
-						<button
-							type="button"
-							onClick={handlePauseToggle}
-							className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-								isPaused
-									? 'bg-cyan-400 text-slate-900 shadow-lg shadow-cyan-400/40 hover:bg-cyan-300'
-									: 'border border-white/20 text-slate-200 hover:border-white/40'
-							}`}
-						>
-							{isPaused ? 'Resume' : 'Pause'}
-						</button>
-						<button
-							type="button"
-							onClick={handleEndEarly}
-							className="rounded-full border border-red-400/60 px-5 py-2 text-sm font-semibold text-red-200 transition hover:border-red-300 hover:text-red-100"
-						>
-							End Early
-						</button>
-					</div>
+					<button
+						type="button"
+						onClick={handleEndEarly}
+						className="self-start rounded-full border border-red-400/60 px-5 py-2 text-sm font-semibold text-red-200 transition hover:border-red-300 hover:text-red-100"
+					>
+						End Early
+					</button>
 				</header>
 
-				<section className="grid gap-8 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-lg lg:grid-cols-[1.2fr_0.8fr] lg:p-10">
-					<div className="flex flex-col justify-between gap-8">
-						<div className="relative flex flex-col items-center justify-center rounded-3xl border border-cyan-400/30 bg-slate-950/60 px-6 py-10 text-center shadow-inner shadow-black/40">
-							<div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-cyan-500/10 via-transparent to-indigo-500/10" />
-							<div className="text-sm uppercase tracking-[0.3em] text-cyan-200">
-								Time Remaining
-							</div>
-							<div className="mt-6 text-6xl font-semibold tracking-tight text-white sm:text-7xl">
-								{formatTime(secondsRemaining)}
-							</div>
-							<div className="mt-4 flex w-full items-center gap-3 text-sm text-slate-300">
-								<div className="flex-1 rounded-full bg-slate-800/60">
-									<div
-										className="h-2 rounded-full bg-cyan-400 transition-all"
-										style={{ width: `${progress}%` }}
-									/>
-								</div>
-								<div className="w-12 text-right tabular-nums text-cyan-100">{progress}%</div>
-							</div>
+				<main className="flex flex-1 flex-col items-center justify-center gap-12 text-center">
+					<div className="space-y-6">
+						<div className="text-xs uppercase tracking-[0.4em] text-slate-500">Time Remaining</div>
+						<div className="text-[clamp(3.5rem,12vw,9rem)] font-semibold tracking-tight text-white">
+							{formatTime(secondsRemaining)}
 						</div>
-
-						<div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-left">
-							<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Ritual</div>
-							<ul className="mt-3 space-y-2 text-sm text-slate-200">
-								<li className="flex items-start gap-2">
-									<span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400" />
-									Breathe in for 4, hold 4, out 6 to drop into focus.
-								</li>
-								<li className="flex items-start gap-2">
-									<span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400" />
-									Close or snooze anything outside today’s target.
-								</li>
-								<li className="flex items-start gap-2">
-									<span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400" />
-									Check alignment halfway and adjust without judgment.
-								</li>
-							</ul>
+						<div className="mx-auto h-2 w-full max-w-xl overflow-hidden rounded-full bg-white/10">
+							<div
+								className="h-full bg-cyan-400 transition-all"
+								style={{ width: `${progress}%` }}
+							/>
 						</div>
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-500">{progress}% complete</div>
 					</div>
 
-					<div className="flex flex-col gap-5">
-						{intake && (
-							<div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
-								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Your Intent</div>
-								<div className="mt-3 space-y-4 text-sm text-slate-200">
+					{intake && (
+						<div className="grid w-full max-w-4xl gap-6 text-left sm:grid-cols-2">
+							<div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
+								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Focus plan</div>
+								<div className="mt-4 space-y-4 text-sm text-slate-200">
 									<div>
 										<div className="text-slate-400">Focus for this sprint</div>
-										<p className="mt-1 text-base text-white">{intake.q3_hour_goal || intake.q4_definition}</p>
+										<p className="mt-1 text-base text-white">{intake.q3_hour_goal || intake.q4_definition || '—'}</p>
 									</div>
 									<div>
-										<div className="text-slate-400">Potential distractions</div>
-										<p className="mt-1">{intake.q5_distractions}</p>
-									</div>
-									<div>
-										<div className="text-slate-400">Guardrails you set</div>
-										<p className="mt-1">{intake.q6_avoid_plan}</p>
+										<div className="text-slate-400">What “done” looks like</div>
+										<p className="mt-1 text-white/90">{intake.q4_definition || '—'}</p>
 									</div>
 								</div>
 							</div>
-						)}
-
-					<div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Quick Actions</div>
-						<div className="mt-4 flex flex-col gap-3">
-							<button
-								type="button"
-								onClick={() => router.push('/reflection')}
-								className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-							>
-								Jump to Reflection
-							</button>
-							<button
-								type="button"
-								onClick={() => router.push('/logs')}
-								className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-							>
-								Review Past Sessions
-							</button>
-							<button
-								type="button"
-								onClick={() => router.push('/dashboard')}
-								className="rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-							>
-								Insights Dashboard
-							</button>
+							<div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
+								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Mindset & guardrails</div>
+								<div className="mt-4 space-y-4 text-sm text-slate-200">
+									<div>
+										<div className="text-slate-400">Headspace check</div>
+										<p className="mt-1 text-white/90">{intake.q1_mind || '—'}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">What you parked</div>
+										<p className="mt-1 text-white/90">{intake.q2_stress || '—'}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">Likely pulls</div>
+										<p className="mt-1 text-white/90">{intake.q5_distractions || '—'}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">Guardrails you committed to</div>
+										<p className="mt-1 text-white/90">{intake.q6_avoid_plan || '—'}</p>
+									</div>
+								</div>
+							</div>
 						</div>
+					)}
+				</main>
+
+				<footer className="flex flex-col gap-6 pb-10 pt-12 sm:flex-row sm:items-center sm:justify-between">
+					<div>
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Ritual</div>
+						<ul className="mt-3 space-y-2 text-sm text-slate-300">
+							<li>Breathe in for 4, hold for 4, out for 6 to drop in.</li>
+							<li>Close or snooze anything outside today’s target.</li>
+							<li>Check alignment halfway and adjust without judgment.</li>
+						</ul>
 					</div>
-				</div>
-			</section>
+					<div className="flex flex-wrap items-center gap-3">
+						<button
+							type="button"
+							onClick={() => router.push('/reflection')}
+							className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+						>
+							Jump to Reflection
+						</button>
+						<button
+							type="button"
+							onClick={() => router.push('/logs')}
+							className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+						>
+							Review Past Sessions
+						</button>
+						<button
+							type="button"
+							onClick={() => router.push('/dashboard')}
+							className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40"
+						>
+							Insights Dashboard
+						</button>
+					</div>
+				</footer>
+			</div>
 		</div>
-	</div>
 	);
 }

@@ -7,7 +7,7 @@ import {
 	getLog,
 	type SessionLog,
 } from '@/lib/lockin-logs';
-import { endSession, pauseSession, resumeSession, useFocusSession } from '@/lib/focus-session';
+import { endSession, useFocusSession } from '@/lib/focus-session';
 
 const formatTime = (secs: number) => {
 	const minutes = Math.floor(secs / 60);
@@ -63,6 +63,21 @@ export default function FocusOverlay() {
 	}, [remaining, router, session]);
 
 	if (!session) return null;
+	const handleEnd = () => {
+		if (!session) return;
+		const payload: SessionLog = {
+			sessionId: session.sessionId,
+			intakeId: session.intakeId,
+			target: session.target,
+			startAt: session.startAt,
+			endAt: Date.now(),
+			lengthMinutes: session.lengthMinutes,
+			completed: false,
+		};
+		addOrUpdateLog(payload);
+		endSession();
+		router.push('/reflection');
+	};
 
 	return (
 		<div className="fixed bottom-5 right-5 z-[1000] max-w-sm">
@@ -72,7 +87,7 @@ export default function FocusOverlay() {
 						{formatTime(remaining)}
 					</div>
 					<div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">
-						{session.paused ? 'Paused' : 'Active'}
+						Active
 					</div>
 				</div>
 				<div className="min-w-0 flex-1">
@@ -86,21 +101,17 @@ export default function FocusOverlay() {
 				<div className="flex flex-col gap-2">
 					<button
 						type="button"
-						onClick={() => {
-							if (!session) return;
-							if (session.paused) resumeSession();
-							else pauseSession();
-						}}
-						className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-white/40"
-					>
-						{session.paused ? 'Resume' : 'Pause'}
-					</button>
-					<button
-						type="button"
 						onClick={() => router.push('/focus')}
 						className="rounded-full bg-cyan-400 px-3 py-1 text-xs font-semibold text-slate-900 shadow shadow-cyan-400/40 transition hover:bg-cyan-300"
 					>
 						Open
+					</button>
+					<button
+						type="button"
+						onClick={handleEnd}
+						className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-slate-200 transition hover:border-red-300 hover:text-red-100"
+					>
+						End
 					</button>
 				</div>
 			</div>

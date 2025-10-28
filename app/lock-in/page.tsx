@@ -15,21 +15,21 @@ const STORAGE_KEY = 'lockin:intake:draft';
 const steps: { key: StepKey; title: string; description: string; placeholder: string }[] = [
 	{
 		key: 'q1_mind',
-		title: "What's pulling at your attention?",
-		description: 'Name the loudest thoughts so you can park them.',
-		placeholder: 'Stream your thoughts here...',
+		title: "How's your headspace right now?",
+		description: 'Name what you notice so we can shape the sprint around it.',
+		placeholder: 'Let it spill here...',
 	},
 	{
 		key: 'q2_stress',
-		title: "What's stressing you out?",
-		description: 'Identifying pressure points deflates them.',
-		placeholder: 'Stressors, triggers, or open loops...',
+		title: 'Anything on your mind you want to park for now?',
+		description: 'Drop the noise in here so it stops looping.',
+		placeholder: 'List thoughts you’re shelving...',
 	},
 	{
 		key: 'q3_hour_goal',
-		title: 'What do you want to achieve this sprint?',
-		description: 'Define the outcome that would feel like momentum.',
-		placeholder: 'Ship the landing page hero copy...',
+		title: 'What are you here to get done?',
+		description: 'State the outcome that would feel like momentum.',
+		placeholder: 'Draft launch email, edit video, finish outline...',
 	},
 	{
 		key: 'q4_definition',
@@ -39,15 +39,15 @@ const steps: { key: StepKey; title: string; description: string; placeholder: st
 	},
 	{
 		key: 'q5_distractions',
-		title: 'What could derail you?',
-		description: 'List the obvious sabotages before they appear.',
-		placeholder: 'Slack, phone, random tabs...',
+		title: 'What usually pulls you away?',
+		description: 'Spot the patterns so you can disarm them.',
+		placeholder: 'Phone, chat, snacks, doomscrolling...',
 	},
 	{
 		key: 'q6_avoid_plan',
 		title: 'How will you stay locked in?',
-		description: 'Create the micro-rules that protect your focus.',
-		placeholder: 'Mute Slack, phone in another room, ambient playlist...',
+		description: 'Set the rules that keep you honest for this sprint.',
+		placeholder: 'Mute notifications, door closed, playlist ready...',
 	},
 ];
 
@@ -75,9 +75,13 @@ export default function LockInPage() {
 	});
 	const activeSession = useFocusSession();
 	const [draftLoaded, setDraftLoaded] = useState<boolean>(false);
+	const lengthOptions = [20, 30, 45, 60];
 
-	const step = steps[cursor];
-	const progress = useMemo(() => Math.round(((cursor + 1) / steps.length) * 100), [cursor]);
+	const questionCount = steps.length;
+	const totalStages = questionCount + 1; // includes final summary stage
+	const isSummary = cursor === questionCount;
+	const step = !isSummary ? steps[cursor] : null;
+	const progress = useMemo(() => Math.round(((cursor + 1) / totalStages) * 100), [cursor, totalStages]);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -113,14 +117,18 @@ export default function LockInPage() {
 		}
 	}, [answers, draftLoaded]);
 
-	const goNext = () => setCursor((index) => Math.min(index + 1, steps.length - 1));
-	const goBack = () => setCursor((index) => Math.max(index - 1, 0));
+	const handleContinue = () => {
+		if (isSummary) return;
+		setCursor((index) => Math.min(index + 1, questionCount));
+	};
 
 	const handleChange = (value: string) => {
+		if (!step) return;
 		setAnswers((prev) => ({ ...prev, [step.key]: value }));
 	};
 
-	const canContinue = (answers[step.key] ?? '').trim().length > 0;
+	const canContinue = !isSummary && step ? (answers[step.key] ?? '').trim().length > 0 : false;
+	const canStart = length > 0;
 
 	const handleStart = () => {
 		const record = saveIntake({
@@ -206,94 +214,126 @@ export default function LockInPage() {
 					</div>
 				)}
 
-				<section className="flex flex-col gap-10 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-lg sm:p-10">
-					<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-						<div>
-							<div className="text-sm uppercase tracking-[0.3em] text-slate-400">
-								Step {cursor + 1} of {steps.length}
-							</div>
-							<h2 className="mt-2 text-3xl font-semibold text-white">{step.title}</h2>
-							<p className="mt-3 max-w-lg text-base text-slate-300">{step.description}</p>
-						</div>
-						<div className="flex flex-wrap gap-2">
-							{[20, 30, 45, 60].map((minutes) => (
-								<button
-									key={minutes}
-									type="button"
-									onClick={() => setLength(minutes)}
-									className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-										length === minutes
-											? 'bg-cyan-400 text-slate-900 shadow-md shadow-cyan-400/40'
-											: 'border border-white/20 text-slate-200 hover:border-white/40'
-									}`}
-								>
-									{minutes}m
-								</button>
-							))}
-						</div>
-					</div>
-
+			<section className="flex flex-col gap-10 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-lg sm:p-10">
+				<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
 					<div>
+						<div className="text-sm uppercase tracking-[0.3em] text-slate-400">
+							{isSummary ? 'Ready to lock in' : `Step ${cursor + 1} of ${questionCount}`}
+						</div>
+						<h2 className="mt-2 text-3xl font-semibold text-white">
+							{isSummary ? 'Dial in your sprint length' : step?.title}
+						</h2>
+						<p className="mt-3 max-w-lg text-base text-slate-300">
+							{isSummary
+								? 'We captured your intent and guardrails. Choose how long you want to stay locked in before you launch.'
+								: step?.description}
+						</p>
+					</div>
+					<div className="flex flex-wrap gap-2">
+						{Array.from({ length: totalStages }).map((_, index) => (
+							<div
+								key={index}
+								className={`h-2 w-14 rounded-full ${index <= cursor ? 'bg-cyan-400' : 'bg-slate-700/60'}`}
+							/>
+						))}
+					</div>
+				</div>
+
+				{!isSummary ? (
+					<>
 						<textarea
-							value={answers[step.key]}
+							value={step ? answers[step.key] : ''}
 							onChange={(event) => handleChange(event.target.value)}
 							className="w-full min-h-[220px] rounded-2xl border border-transparent bg-slate-950/60 p-5 text-base text-slate-100 shadow-inner shadow-black/40 outline-none ring-2 ring-inset ring-white/10 transition focus:ring-cyan-400/60"
-							placeholder={step.placeholder}
+							placeholder={step?.placeholder}
 						/>
-					</div>
 
-					<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-						<div className="flex flex-1 items-center gap-2">
-							{steps.map((_, index) => (
-								<div
-									key={index}
-									className={`h-2 flex-1 rounded-full ${
-										index <= cursor ? 'bg-cyan-400' : 'bg-slate-700/60'
-									}`}
-								/>
-							))}
-						</div>
-						<div className="flex items-center gap-3">
+						<div className="flex justify-end">
 							<button
 								type="button"
-								onClick={goBack}
-								disabled={cursor === 0}
-								className={`rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition ${
-									cursor === 0 ? 'cursor-not-allowed opacity-50' : 'hover:border-white/40'
+								onClick={handleContinue}
+								disabled={!canContinue}
+								className={`rounded-full px-7 py-2 text-sm font-semibold transition ${
+									canContinue
+										? 'bg-white text-slate-900 shadow shadow-white/40 hover:bg-slate-100'
+										: 'bg-white/10 text-slate-400 cursor-not-allowed'
 								}`}
 							>
-								Back
+								Continue
 							</button>
-							{cursor < steps.length - 1 ? (
-								<button
-									type="button"
-									onClick={goNext}
-									disabled={!canContinue}
-									className={`rounded-full px-6 py-2 text-sm font-semibold transition ${
-										canContinue
-											? 'bg-white text-slate-900 hover:bg-slate-100'
-											: 'bg-white/10 text-slate-400 cursor-not-allowed'
-									}`}
-								>
-									Continue
-								</button>
-							) : (
-								<button
-									type="button"
-									onClick={handleStart}
-									disabled={!canContinue}
-									className={`rounded-full px-6 py-2 text-sm font-semibold transition ${
-										canContinue
-											? 'bg-cyan-400 text-slate-900 shadow-lg shadow-cyan-400/40 hover:bg-cyan-300'
-											: 'bg-white/10 text-slate-400 cursor-not-allowed'
-									}`}
-								>
-									Start Session
-								</button>
-							)}
+						</div>
+					</>
+				) : (
+					<div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+						<div className="space-y-6">
+							<div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
+								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Sprint length</div>
+								<p className="mt-3 text-sm text-slate-300">How long are you locking in for this run?</p>
+								<div className="mt-4 flex flex-wrap gap-2">
+									{lengthOptions.map((minutes) => (
+										<button
+											key={minutes}
+											type="button"
+											onClick={() => setLength(minutes)}
+											className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+												length === minutes
+													? 'bg-cyan-400 text-slate-900 shadow-md shadow-cyan-400/40'
+													: 'border border-white/20 text-slate-200 hover:border-white/40'
+											}`}
+										>
+											{minutes} minutes
+										</button>
+									))}
+								</div>
+							</div>
+							<div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6">
+								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Your plan</div>
+								<div className="mt-4 space-y-4 text-sm text-slate-200">
+									<div>
+										<div className="text-slate-400">Headspace check</div>
+										<p className="mt-1 text-base text-white">{answers.q1_mind || '—'}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">What you’re parking</div>
+										<p className="mt-1">{answers.q2_stress || '—'}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">Focus for this sprint</div>
+										<p className="mt-1 text-base text-white">{answers.q3_hour_goal || '—'}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">What “done” looks like</div>
+										<p className="mt-1">{answers.q4_definition || '—'}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">Likely pulls</div>
+										<p className="mt-1">{answers.q5_distractions || '—'}</p>
+									</div>
+									<div>
+										<div className="text-slate-400">Guardrails you set</div>
+										<p className="mt-1">{answers.q6_avoid_plan || '—'}</p>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div className="flex justify-end">
+							<button
+								type="button"
+								onClick={handleStart}
+								disabled={!canStart}
+								className={`rounded-full px-7 py-2 text-sm font-semibold transition ${
+									canStart
+										? 'bg-cyan-400 text-slate-900 shadow-lg shadow-cyan-400/40 hover:bg-cyan-300'
+										: 'bg-white/10 text-slate-400 cursor-not-allowed'
+								}`}
+							>
+								Start Lock-In
+							</button>
 						</div>
 					</div>
-				</section>
+				)}
+			</section>
 			</div>
 		</div>
 	);
