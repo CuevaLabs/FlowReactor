@@ -9,6 +9,7 @@ export default function ResetPage() {
 	const [isBreathing, setIsBreathing] = useState(false);
 	const [breathPhase, setBreathPhase] = useState<'inhale' | 'hold' | 'exhale'>('inhale');
 	const [timeRemaining, setTimeRemaining] = useState(0);
+	const [reflectionSummary, setReflectionSummary] = useState<string | null>(null);
 	const router = useRouter();
 
 	const breathingSequence = [
@@ -47,12 +48,26 @@ export default function ResetPage() {
 		return () => clearInterval(interval);
 	}, [isBreathing, timeRemaining, breathPhase, breathCount]);
 
+	useEffect(() => {
+		if (typeof window === 'undefined') {
+			return;
+		}
+		const content = localStorage.getItem('postFocusDumpContent');
+		if (content && content.trim().length > 0) {
+			setReflectionSummary(content.trim());
+		}
+	}, []);
+
 	const startBreathing = () => {
 		setPhase('breathing');
 		setIsBreathing(true);
 		setBreathPhase('inhale');
 		setTimeRemaining(3);
 		setBreathCount(0);
+	};
+
+	const skipBreathing = () => {
+		router.push('/flow');
 	};
 
 	const getCircleSize = () => {
@@ -136,11 +151,33 @@ export default function ResetPage() {
 							</p>
 						</div>
 
+						{reflectionSummary && (
+							<div className="bg-gray-900 rounded-lg p-6 mb-8 max-w-2xl mx-auto text-left">
+								<h3 className="text-sm uppercase tracking-widest text-gray-500 mb-2">
+									Your last reflection
+								</h3>
+								<p className="text-gray-200 whitespace-pre-wrap leading-relaxed">
+									{reflectionSummary.length > 320
+										? `${reflectionSummary.slice(0, 320)}...`
+										: reflectionSummary}
+								</p>
+								<p className="text-sm text-gray-500 mt-3">
+									Let these thoughts settle while you reset your nervous system. You can always revisit them later.
+								</p>
+							</div>
+						)}
+
 						<button
 							onClick={startBreathing}
 							className="bg-purple-600 text-white font-bold py-4 px-8 rounded-lg text-xl hover:bg-purple-700 transition-colors"
 						>
 							Start Breathing Exercise
+						</button>
+						<button
+							onClick={skipBreathing}
+							className="block mx-auto text-gray-400 hover:text-white transition-colors mt-4"
+						>
+							Skip breathing and jump to flow
 						</button>
 					</div>
 				)}
@@ -192,6 +229,12 @@ export default function ResetPage() {
 								/>
 							</div>
 						</div>
+						<button
+							onClick={skipBreathing}
+							className="mt-10 text-gray-400 hover:text-white transition-colors"
+						>
+							Skip to flow state
+						</button>
 					</div>
 				)}
 
@@ -229,6 +272,19 @@ export default function ResetPage() {
 								</div>
 							</div>
 						</div>
+
+						{reflectionSummary && (
+							<div className="bg-gray-900 rounded-lg p-6 mb-8 max-w-2xl mx-auto text-left">
+								<h3 className="text-sm uppercase tracking-widest text-gray-500 mb-2">
+									What you captured afterwards
+								</h3>
+								<p className="text-gray-200 whitespace-pre-wrap leading-relaxed">
+									{reflectionSummary.length > 320
+										? `${reflectionSummary.slice(0, 320)}...`
+										: reflectionSummary}
+								</p>
+							</div>
+						)}
 
 						<button
 							onClick={handleComplete}

@@ -1,15 +1,43 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+type DumpMode = 'initial' | 'reflection';
 
 export default function BrainDumpPage() {
-	const [content, setContent] = useState('');
-	const [isActive, setIsActive] = useState(false);
-	const [timeRemaining, setTimeRemaining] = useState(600); // 10 minutes in seconds
-	const [isComplete, setIsComplete] = useState(false);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const router = useRouter();
+	const searchParams = useSearchParams();
+
+	const mode: DumpMode = useMemo(() => {
+		return searchParams.get('mode') === 'reflection' ? 'reflection' : 'initial';
+	}, [searchParams]);
+
+	const defaultDuration = mode === 'reflection' ? 300 : 600;
+	const quickDuration = mode === 'reflection' ? 120 : 300;
+
+	const [content, setContent] = useState('');
+	const [isActive, setIsActive] = useState(false);
+	const [timeRemaining, setTimeRemaining] = useState(defaultDuration);
+	const [isComplete, setIsComplete] = useState(false);
+	const [lastFocusTask, setLastFocusTask] = useState<string | null>(null);
+
+	// Reset session when mode changes
+	useEffect(() => {
+		setContent('');
+		setIsActive(false);
+		setIsComplete(false);
+		setTimeRemaining(defaultDuration);
+	}, [mode, defaultDuration]);
+
+	// Load context about the last focus sprint for reflection mode
+	useEffect(() => {
+		if (mode === 'reflection' && typeof window !== 'undefined') {
+			const storedTask = localStorage.getItem('lastFocusTask');
+			setLastFocusTask(storedTask && storedTask.trim().length > 0 ? storedTask : null);
+		}
+	}, [mode]);
 
 	// Timer effect
 	useEffect(() => {
@@ -32,7 +60,7 @@ export default function BrainDumpPage() {
 		}
 	}, []);
 
-	const startDump = (duration = 600) => {
+	const startDump = (duration: number = defaultDuration) => {
 		setIsActive(true);
 		setIsComplete(false);
 		setTimeRemaining(duration);
@@ -49,12 +77,48 @@ export default function BrainDumpPage() {
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	};
 
-	const handleComplete = () => {
-		// Store the brain dump content (in a real app, this would go to a database)
-		if (typeof window !== 'undefined') {
-			localStorage.setItem('brainDumpContent', content);
+	const persistDump = () => {
+		if (typeof window === 'undefined') {
+			return;
 		}
-		router.push('/organize');
+		const storageKey = mode === 'reflection' ? 'postFocusDumpContent' : 'brainDumpContent';
+		localStorage.setItem(storageKey, content);
+	};
+
+	const handleRoute = (path: string) => {
+		persistDump();
+		router.push(path);
+	};
+
+	const primaryStartLabel =
+		mode === 'reflection' ? 'Start 5-Minute Reflection' : 'Start 10-Minute Brain Dump';
+	const quickStartLabel =
+		mode === 'reflection'
+			? 'Need something lighter? Try a 2-minute check-in'
+			: 'Or try a quick 5-minute dump';
+	const heroTitle =
+		mode === 'reflection' ? 'Decompress After Your Sprint' : 'Ready to Clear Your Mind?';
+	const heroDescription =
+		mode === 'reflection'
+			? 'Capture leftover thoughts, wins, and anything pulling at your attention before you reset.'
+			: "Write down everything on your mind - tasks, worries, ideas, open loops. Don't worry about organization or grammar. Just dump it all out.";
+	const completionTitle =
+		mode === 'reflection' ? 'Reflection Saved!' : 'Dump Complete!';
+	const completionCopy =
+		mode === 'reflection'
+			? 'Nice work processing your session. A captured mind is a calmer mind.'
+			: `Great job! You've cleared ${
+					content.split(/\s+/).filter((word) => word.length > 0).length
+				} words from your mental RAM. Now choose how you want to move forward.`;
+
+	const resetSession = () => {
+		setContent('');
+		setIsActive(false);
+		setIsComplete(false);
+		setTimeRemaining(defaultDuration);
+		if (textareaRef.current) {
+			textareaRef.current.focus();
+		}
 	};
 
 	return (
@@ -62,7 +126,9 @@ export default function BrainDumpPage() {
 			{/* Header */}
 			<div className="border-b border-gray-800 p-4">
 				<div className="max-w-4xl mx-auto flex justify-between items-center">
-					<h1 className="text-2xl font-bold">Brain Dump Mode</h1>
+					<h1 className="text-2xl font-bold">
+						{mode === 'reflection' ? 'Post-Sprint Brain Sweep' : 'Brain Dump Mode'}
+					</h1>
 					{!isComplete && (
 						<div className="text-right">
 							<div className="text-3xl font-mono font-bold text-green-400">
@@ -82,25 +148,35 @@ export default function BrainDumpPage() {
 							<div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
 								<span className="text-4xl">🧠</span>
 							</div>
-							<h2 className="text-3xl font-bold mb-4">Ready to Clear Your Mind?</h2>
-							<p className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
-								Write down everything on your mind - tasks, worries, ideas, open loops. 
-								Don't worry about organization or grammar. Just dump it all out.
-							</p>
+							<h2 className="text-3xl font-bold mb-4">{heroTitle}</h2>
+							<div className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto space-y-4">
+								<p>{heroDescription}</p>
+								{mode === 'reflection' && lastFocusTask && (
+									<div className="bg-gray-900 border border-gray-700 rounded-lg p-4 text-left">
+										<p className="text-sm text-gray-500 mb-1 uppercase tracking-wide">
+											Last focus target
+										</p>
+										<p className="text-base text-gray-200">{lastFocusTask}</p>
+										<p className="text-sm text-gray-500 mt-3">
+											Note what felt sticky, what you completed, and anything new tugging at your attention.
+										</p>
+									</div>
+								)}
+							</div>
 						</div>
 						
 						<div className="space-y-4">
 							<button
-								onClick={() => startDump()}
+								onClick={() => startDump(defaultDuration)}
 								className="bg-white text-black font-bold py-4 px-8 rounded-lg text-xl hover:bg-gray-100 transition-colors"
 							>
-								Start 10-Minute Brain Dump
+								{primaryStartLabel}
 							</button>
 							<button
-								onClick={() => startDump(300)}
+								onClick={() => startDump(quickDuration)}
 								className="block mx-auto text-gray-400 hover:text-white transition-colors"
 							>
-								Or try a quick 5-minute dump
+								{quickStartLabel}
 							</button>
 						</div>
 					</div>
@@ -110,7 +186,9 @@ export default function BrainDumpPage() {
 					<div className="py-8">
 						<div className="mb-6">
 							<div className="flex items-center justify-between mb-4">
-								<h3 className="text-xl font-semibold">Dump Everything Here</h3>
+								<h3 className="text-xl font-semibold">
+									{mode === 'reflection' ? 'Capture the afterglow' : 'Dump Everything Here'}
+								</h3>
 								<button
 									onClick={stopDump}
 									className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
@@ -134,7 +212,8 @@ export default function BrainDumpPage() {
 
 						<div className="mt-4 text-center">
 							<div className="text-sm text-gray-500">
-								{content.length} characters • {content.split(/\s+/).filter(word => word.length > 0).length} words
+								{content.length} characters •{' '}
+								{content.split(/\s+/).filter(word => word.length > 0).length} words
 							</div>
 						</div>
 					</div>
@@ -146,31 +225,53 @@ export default function BrainDumpPage() {
 							<div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
 								<span className="text-4xl">✅</span>
 							</div>
-							<h2 className="text-3xl font-bold mb-4">Dump Complete!</h2>
-							<p className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
-								Great job! You've cleared {content.split(/\s+/).filter(word => word.length > 0).length} words from your mental RAM. 
-								Now let's organize these thoughts into actionable items.
-							</p>
+							<h2 className="text-3xl font-bold mb-4">{completionTitle}</h2>
+							<p className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto">{completionCopy}</p>
 						</div>
 
-						<div className="space-y-4">
-							<button
-								onClick={handleComplete}
-								className="bg-white text-black font-bold py-4 px-8 rounded-lg text-xl hover:bg-gray-100 transition-colors"
-							>
-								Organize Your Thoughts
-							</button>
-							<button
-								onClick={() => {
-									setContent('');
-									setIsComplete(false);
-									setTimeRemaining(600);
-								}}
-								className="block mx-auto text-gray-400 hover:text-white transition-colors"
-							>
-								Start Over
-							</button>
-						</div>
+						{mode === 'reflection' ? (
+							<div className="space-y-4">
+								<button
+									onClick={() => handleRoute('/reset')}
+									className="bg-white text-black font-bold py-4 px-8 rounded-lg text-xl hover:bg-gray-100 transition-colors"
+								>
+									Start Breathwork Reset
+								</button>
+								<button
+									onClick={() => handleRoute('/focus')}
+									className="block mx-auto text-gray-400 hover:text-white transition-colors"
+								>
+									Queue Another Focus Sprint
+								</button>
+								<button
+									onClick={resetSession}
+									className="block mx-auto text-gray-500 hover:text-white transition-colors text-sm"
+								>
+									Start Over
+								</button>
+							</div>
+						) : (
+							<div className="space-y-4">
+								<button
+									onClick={() => handleRoute('/focus')}
+									className="bg-white text-black font-bold py-4 px-8 rounded-lg text-xl hover:bg-gray-100 transition-colors"
+								>
+									Begin Focused Work Session
+								</button>
+								<button
+									onClick={() => handleRoute('/organize')}
+									className="block mx-auto text-gray-400 hover:text-white transition-colors"
+								>
+									Organize Into Actions
+								</button>
+								<button
+									onClick={resetSession}
+									className="block mx-auto text-gray-500 hover:text-white transition-colors text-sm"
+								>
+									Start Over
+								</button>
+							</div>
+						)}
 					</div>
 				)}
 			</div>
