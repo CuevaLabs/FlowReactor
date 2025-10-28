@@ -1,21 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 type DumpMode = 'initial' | 'reflection';
 
-export default function BrainDumpPage() {
+function BrainDumpContent() {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const router = useRouter();
 	const searchParams = useSearchParams();
 
-	const mode: DumpMode = useMemo(() => {
-		return searchParams.get('mode') === 'reflection' ? 'reflection' : 'initial';
-	}, [searchParams]);
-
-	const defaultDuration = mode === 'reflection' ? 300 : 600;
-	const quickDuration = mode === 'reflection' ? 120 : 300;
+	const searchParamMode = searchParams.get('mode');
+	const mode: DumpMode = searchParamMode === 'reflection' ? 'reflection' : 'initial';
+	const defaultDuration = useMemo(() => (mode === 'reflection' ? 300 : 600), [mode]);
+	const quickDuration = useMemo(() => (mode === 'reflection' ? 120 : 300), [mode]);
 
 	const [content, setContent] = useState('');
 	const [isActive, setIsActive] = useState(false);
@@ -276,5 +274,26 @@ export default function BrainDumpPage() {
 				)}
 			</div>
 		</div>
+	);
+}
+
+function BrainDumpLoading() {
+	return (
+		<div className="min-h-screen bg-black text-white flex items-center justify-center">
+			<div className="text-center space-y-3">
+				<div className="text-lg text-gray-400">Loading your brain dump tools...</div>
+				<div className="h-1 w-40 bg-gray-800 rounded-full overflow-hidden mx-auto">
+					<div className="h-full w-1/2 bg-green-500 animate-pulse" />
+				</div>
+			</div>
+		</div>
+	);
+}
+
+export default function BrainDumpPage() {
+	return (
+		<Suspense fallback={<BrainDumpLoading />}>
+			<BrainDumpContent />
+		</Suspense>
 	);
 }
