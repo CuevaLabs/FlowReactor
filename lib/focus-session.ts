@@ -10,27 +10,46 @@ export type FocusSession = {
 };
 
 const KEY = "focusSession";
+const MEMORY_EVENT = "lockin:session-change";
 
-export function getSession(): FocusSession | null {
-    if (typeof window === "undefined") return null;
-    try {
-        const raw = localStorage.getItem(KEY);
-        return raw ? (JSON.parse(raw) as FocusSession) : null;
-    } catch {
-        return null;
-    }
-}
+let memorySession: FocusSession | null = null;
 
-export function setSession(session: FocusSession | null) {
+function emitChange() {
     if (typeof window === "undefined") return;
-    if (session) localStorage.setItem(KEY, JSON.stringify(session));
-    else localStorage.removeItem(KEY);
-    // notify same-tab listeners
+    try {
+        window.dispatchEvent(new Event(MEMORY_EVENT));
+    } catch {
+        // ignore dispatch issues
+    }
     try {
         window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
     } catch {
         // ignore
     }
+}
+
+export function getSession(): FocusSession | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = localStorage.getItem(KEY);
+        const parsed = raw ? (JSON.parse(raw) as FocusSession) : null;
+        memorySession = parsed;
+        return parsed;
+    } catch {
+        return memorySession;
+    }
+}
+
+export function setSession(session: FocusSession | null) {
+    if (typeof window === "undefined") return;
+    memorySession = session;
+    try {
+        if (session) localStorage.setItem(KEY, JSON.stringify(session));
+        else localStorage.removeItem(KEY);
+    } catch {
+        // ignore quota or access errors
+    }
+    emitChange();
 }
 
 export function startSession(target: string, lengthMinutes: number, intakeId?: string) {
@@ -66,6 +85,17 @@ export function resumeSession() {
     setSession({ ...rest, paused: false, endAt });
 }
 
+export function subscribeSession(callback: () => void) {
+    if (typeof window === "undefined") return () => {};
+    const handler = () => callback();
+    window.addEventListener("storage", handler);
+    window.addEventListener(MEMORY_EVENT, handler);
+    return () => {
+        window.removeEventListener("storage", handler);
+        window.removeEventListener(MEMORY_EVENT, handler);
+    };
+}
+
 export function cryptoRandomId(): string {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
         // @ts-ignore
@@ -74,5 +104,4 @@ export function cryptoRandomId(): string {
     // Fallback
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
-
 

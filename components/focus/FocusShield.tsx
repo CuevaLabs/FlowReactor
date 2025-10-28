@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getSession } from '@/lib/focus-session';
+import { getSession, subscribeSession } from '@/lib/focus-session';
 
 const BLOCKED_HOSTS = [
 	'discord.com',
@@ -27,11 +27,8 @@ export default function FocusShield() {
 	useEffect(() => {
 		const update = () => setActive(!!getSession());
 		update();
-		const onStorage = (event: StorageEvent) => {
-			if (!event.key || event.key === 'focusSession') update();
-		};
-		window.addEventListener('storage', onStorage);
-		return () => window.removeEventListener('storage', onStorage);
+		const unsubscribe = subscribeSession(update);
+		return () => unsubscribe();
 	}, []);
 
 	useEffect(() => {

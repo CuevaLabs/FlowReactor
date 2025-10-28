@@ -21,6 +21,7 @@ export type SessionLog = {
 };
 
 const KEY = 'lockin:logs';
+let memoryLogs: SessionLog[] = [];
 
 export function addOrUpdateLog(entry: SessionLog) {
     const all = getLogs();
@@ -37,15 +38,21 @@ export function getLogs(): SessionLog[] {
     if (typeof window === 'undefined') return [];
     try {
         const raw = localStorage.getItem(KEY);
-        return raw ? (JSON.parse(raw) as SessionLog[]) : [];
+        const parsed = raw ? (JSON.parse(raw) as SessionLog[]) : [];
+        memoryLogs = parsed;
+        return parsed;
     } catch {
-        return [];
+        return memoryLogs;
     }
 }
 
 function setLogs(items: SessionLog[]) {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(KEY, JSON.stringify(items));
+    memoryLogs = items;
+    try {
+        localStorage.setItem(KEY, JSON.stringify(items));
+    } catch {
+        // ignore storage errors
+    }
 }
-
 

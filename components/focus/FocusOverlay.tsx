@@ -12,6 +12,7 @@ import {
 	getSession,
 	pauseSession,
 	resumeSession,
+	subscribeSession,
 	type FocusSession,
 } from '@/lib/focus-session';
 
@@ -32,20 +33,15 @@ export default function FocusOverlay() {
 		const hydrate = () => {
 			const data = getSession();
 			setSession(data);
-			if (data) setIsPaused(data.paused);
+			setIsPaused(data?.paused ?? false);
 		};
 
 		hydrate();
-
-		const onStorage = (event: StorageEvent) => {
-			if (!event.key || event.key === 'focusSession') hydrate();
-		};
-
-		window.addEventListener('storage', onStorage);
+		const unsubscribe = subscribeSession(hydrate);
 		const tick = setInterval(() => setNow(Date.now()), 1000);
 
 		return () => {
-			window.removeEventListener('storage', onStorage);
+			unsubscribe();
 			clearInterval(tick);
 		};
 	}, []);

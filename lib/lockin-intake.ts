@@ -12,6 +12,7 @@ export type IntakeAnswers = {
 };
 
 const KEY = 'lockin:intakes';
+let memoryIntakes: IntakeAnswers[] = [];
 
 export function saveIntake(answers: Omit<IntakeAnswers, 'id' | 'createdAt'>): IntakeAnswers {
     const record: IntakeAnswers = {
@@ -33,15 +34,22 @@ export function getAllIntakes(): IntakeAnswers[] {
     if (typeof window === 'undefined') return [];
     try {
         const raw = localStorage.getItem(KEY);
-        return raw ? (JSON.parse(raw) as IntakeAnswers[]) : [];
+        const parsed = raw ? (JSON.parse(raw) as IntakeAnswers[]) : [];
+        memoryIntakes = parsed;
+        return parsed;
     } catch {
-        return [];
+        return memoryIntakes;
     }
 }
 
 function setAllIntakes(items: IntakeAnswers[]) {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(KEY, JSON.stringify(items));
+    memoryIntakes = items;
+    try {
+        localStorage.setItem(KEY, JSON.stringify(items));
+    } catch {
+        // ignore storage errors
+    }
 }
 
 function randomId(): string {
@@ -51,4 +59,3 @@ function randomId(): string {
     }
     return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
-

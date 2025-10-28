@@ -12,6 +12,7 @@ import {
 	getSession,
 	pauseSession,
 	resumeSession,
+	subscribeSession,
 	type FocusSession,
 } from '@/lib/focus-session';
 import { getIntake } from '@/lib/lockin-intake';
@@ -30,79 +31,74 @@ export default function FocusPage() {
 	const [isPaused, setIsPaused] = useState<boolean>(false);
 	const hasRedirected = useRef<boolean>(false);
 
-	useEffect(() => {
-		if (typeof window === 'undefined') return;
+useEffect(() => {
+	if (typeof window === 'undefined') return;
 
-		const hydrate = () => {
-			const current = getSession();
-			if (!current) {
-				if (!hasRedirected.current) {
-					router.replace('/lock-in');
-					hasRedirected.current = true;
-				}
-				return;
+	const hydrate = () => {
+		const current = getSession();
+		if (!current) {
+			if (!hasRedirected.current) {
+				router.replace('/lock-in');
+				hasRedirected.current = true;
 			}
-
-			const secondsRemaining = Math.max(
-				0,
-				Math.floor((current.endAt - Date.now()) / 1000),
-			);
-
-			setSession(current);
-			setRemaining(current.paused ? current.remaining ?? secondsRemaining : secondsRemaining);
-			setInitialTotal(current.lengthMinutes * 60);
-			setIsPaused(current.paused);
-		};
-
-		hydrate();
-
-		const tick = setInterval(() => {
-			setRemaining((prev) => {
-				if (isPaused || !session) return prev;
-				return Math.max(0, prev - 1);
-			});
-		}, 1000);
-
-		const onStorage = (event: StorageEvent) => {
-			if (!event.key || event.key === 'focusSession') hydrate();
-		};
-
-		window.addEventListener('storage', onStorage);
-
-		return () => {
-			clearInterval(tick);
-			window.removeEventListener('storage', onStorage);
-		};
-	}, [isPaused, router, session]);
-
-	useEffect(() => {
-		if (!session || remaining > 0 || isPaused) return;
-
-		const existingLog = getLog(session.sessionId);
-		const payload: SessionLog = {
-			sessionId: session.sessionId,
-			intakeId: session.intakeId,
-			target: session.target,
-			startAt: session.startAt,
-			endAt: Date.now(),
-			lengthMinutes: session.lengthMinutes,
-			completed: true,
-		};
-
-		if (existingLog?.reflection) {
-			payload.reflection = existingLog.reflection;
-			payload.insights = existingLog.insights;
+			return;
 		}
 
-	addOrUpdateLog(payload);
-	endSession();
+		const secondsRemaining = Math.max(
+			0,
+			Math.floor((current.endAt - Date.now()) / 1000),
+		);
 
-	if (!hasRedirected.current) {
-		hasRedirected.current = true;
-		setSession(null);
-		setRemaining(0);
-		router.push(session.intakeId ? `/reflection?sessionId=${session.sessionId}` : '/reflection');
-	}
+		setSession(current);
+		setRemaining(current.paused ? current.remaining ?? secondsRemaining : secondsRemaining);
+		setInitialTotal(current.lengthMinutes * 60);
+		setIsPaused(current.paused);
+	};
+
+	hydrate();
+	const unsubscribe = subscribeSession(hydrate);
+
+	const tick = setInterval(() => {
+		setRemaining((prev) => {
+			if (isPaused || !session) return prev;
+			return Math.max(0, prev - 1);
+		});
+	}, 1000);
+
+	return () => {
+		clearInterval(tick);
+		unsubscribe();
+	};
+}, [isPaused, router, session]);
+
+	useEffect(() => {
+    if (!session || remaining > 0 || isPaused) return;
+
+    const existingLog = getLog(session.sessionId);
+    const payload: SessionLog = {
+        sessionId: session.sessionId,
+        intakeId: session.intakeId,
+        target: session.target,
+        startAt: session.startAt,
+        endAt: Date.now(),
+        lengthMinutes: session.lengthMinutes,
+        completed: true,
+    };
+
+    if (existingLog?.reflection) {
+        payload.reflection = existingLog.reflection;
+        payload.insights = existingLog.insights;
+    }
+
+    addOrUpdateLog(payload);
+    endSession();
+
+    if (!hasRedirected.current) {
+        hasRedirected.current = true;
+        setSession(null);
+        setRemaining(0);
+        router.push(session.intakeId ? `/reflection?sessionId=${session.sessionId}` : '/reflection');
+    }
 }, [isPaused, remaining, router, session]);
 
 	if (!session) {

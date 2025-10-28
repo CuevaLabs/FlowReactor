@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveIntake, type IntakeAnswers } from '@/lib/lockin-intake';
-import { getSession, startSession, type FocusSession } from '@/lib/focus-session';
+import { getSession, startSession, subscribeSession, type FocusSession } from '@/lib/focus-session';
 
 type StepKey = keyof Pick<
 	IntakeAnswers,
@@ -66,8 +66,12 @@ export default function LockInPage() {
 	const [answers, setAnswers] = useState<Record<StepKey, string>>(defaultAnswers);
 	const [length, setLength] = useState<number>(() => {
 		if (typeof window === 'undefined') return 25;
-		const stored = window.localStorage.getItem('focusSessionLength');
-		return stored ? Number.parseInt(stored, 10) || 25 : 25;
+		try {
+			const stored = window.localStorage.getItem('focusSessionLength');
+			return stored ? Number.parseInt(stored, 10) || 25 : 25;
+		} catch {
+			return 25;
+		}
 	});
 	const [activeSession, setActiveSession] = useState<FocusSession | null>(null);
 	const [draftLoaded, setDraftLoaded] = useState<boolean>(false);
@@ -88,29 +92,31 @@ export default function LockInPage() {
 				setAnswers({ ...defaultAnswers, ...parsed });
 			}
 		} catch {
-			// ignore corrupted draft
+			// ignore corrupted draft or blocked storage
 		} finally {
 			setDraftLoaded(true);
 		}
 
-		const onStorage = (event: StorageEvent) => {
-			if (!event.key || event.key === 'focusSession') {
-				setActiveSession(getSession());
-			}
-		};
-
-		window.addEventListener('storage', onStorage);
-		return () => window.removeEventListener('storage', onStorage);
+		const unsubscribe = subscribeSession(() => setActiveSession(getSession()));
+		return () => unsubscribe();
 	}, []);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
-		window.localStorage.setItem('focusSessionLength', String(length));
+		try {
+			window.localStorage.setItem('focusSessionLength', String(length));
+		} catch {
+			// ignore storage errors
+		}
 	}, [length]);
 
 	useEffect(() => {
 		if (!draftLoaded || typeof window === 'undefined') return;
-		window.localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
+		try {
+			window.localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
+		} catch {
+			// storage might be blocked; ignore
+		}
 	}, [answers, draftLoaded]);
 
 	const goNext = () => setCursor((index) => Math.min(index + 1, steps.length - 1));
@@ -141,7 +147,11 @@ export default function LockInPage() {
 
 		startSession(target, length, record.id);
 		if (typeof window !== 'undefined') {
-			window.localStorage.removeItem(STORAGE_KEY);
+			try {
+				window.localStorage.removeItem(STORAGE_KEY);
+			} catch {
+				// ignore storage errors
+			}
 		}
 		router.push('/focus');
 	};
