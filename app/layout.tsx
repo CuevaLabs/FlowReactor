@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import FocusOverlay from "@/components/focus/FocusOverlay";
+import FocusShield from "@/components/focus/FocusShield";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -13,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Brain Dump App",
-	description: "Clear Your Mind, Unlock Your Flow",
+	title: "Lock-In",
+	description: "Guide your mind. Block distractions. Do the work.",
 };
 
 export default function RootLayout({
@@ -28,6 +30,8 @@ export default function RootLayout({
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>
 				{children}
+				<FocusOverlay />
+				<FocusShield />
 			</body>
 		</html>
 	);

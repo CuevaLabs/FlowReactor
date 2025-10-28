@@ -5,10 +5,10 @@
 
 export const appConfig = {
 	// App Branding
-	name: "Brain Dump App",
-	tagline: "Clear Your Mind, Unlock Your Flow",
+	name: "Lock-In",
+	tagline: "Guide your mind. Block distractions. Do the work.",
 	description:
-		"A powerful cognitive load management tool for content creators. Clear mental clutter, achieve flow state, and maintain peak performance.",
+		"Guided preparation + distraction shield + focused sprints to help you lock in and ship.",
 
 	// Company/Creator Info
 	creator: {

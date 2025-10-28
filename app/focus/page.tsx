@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { getSession, pauseSession, resumeSession, endSession, type FocusSession } from '@/lib/focus-session';
+import { addOrUpdateLog } from '@/lib/lockin-logs';
 
 type SessionPhase = 'select' | 'focus' | 'complete';
 
@@ -37,7 +39,8 @@ const formatTime = (seconds: number) => {
 };
 
 export default function FocusSessionPage() {
-	const router = useRouter();
+    const router = useRouter();
+    const searchParams = useSearchParams();
 	const [phase, setPhase] = useState<SessionPhase>('select');
 	const [entries, setEntries] = useState<Suggestion[]>([]);
 	const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -46,6 +49,7 @@ export default function FocusSessionPage() {
 	const [timeRemaining, setTimeRemaining] = useState(sessionLength * 60);
 	const [isPaused, setIsPaused] = useState(false);
 	const [focusTarget, setFocusTarget] = useState<string | null>(null);
+    const [currentSession, setCurrentSession] = useState<FocusSession | null>(null);
 
 	const targetPreview = useMemo(() => {
 		const custom = customFocus.trim();
@@ -67,32 +71,71 @@ export default function FocusSessionPage() {
 		return total === 0 ? 0 : Math.min(100, ((total - timeRemaining) / total) * 100);
 	}, [phase, sessionLength, timeRemaining]);
 
-	useEffect(() => {
-		if (typeof window === 'undefined') {
-			return;
-		}
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
 
-		const storedDump = localStorage.getItem('brainDumpContent');
-		if (storedDump) {
-			setEntries(parseBrainDump(storedDump));
-		}
+        // If a global session exists (from Lock-In), attach to it
+        const s = getSession();
+        if (s) {
+            setCurrentSession(s);
+            setFocusTarget(s.target);
+            setSessionLength(s.lengthMinutes);
+            setIsPaused(s.paused);
+            setPhase('focus');
+            setTimeRemaining(Math.max(0, Math.floor((s.endAt - Date.now()) / 1000)));
+        } else {
+            // No active session; route to Lock-In flow to prepare
+            router.replace('/lock-in');
+            return;
+        }
 
-		const storedLength = localStorage.getItem('focusSessionLength');
-		if (storedLength) {
-			const parsed = parseInt(storedLength, 10);
-			if (!Number.isNaN(parsed) && parsed > 0) {
-				setSessionLength(parsed);
-				setTimeRemaining(parsed * 60);
-			}
-		}
-	}, []);
+        const onStorage = (e: StorageEvent) => {
+            if (!e.key || e.key === 'focusSession') {
+                const next = getSession();
+                setCurrentSession(next);
+                if (next) {
+                    setIsPaused(next.paused);
+                    setFocusTarget(next.target);
+                    setSessionLength(next.lengthMinutes);
+                    setTimeRemaining(Math.max(0, Math.floor((next.endAt - Date.now()) / 1000)));
+                }
+            }
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, [router]);
 
-	// Keep timer display in sync when adjusting length before starting
-	useEffect(() => {
-		if (phase === 'select') {
-			setTimeRemaining(sessionLength * 60);
-		}
-	}, [sessionLength, phase]);
+    // When driven by global session, update remaining every second if not paused
+    useEffect(() => {
+        if (phase !== 'focus' || isPaused) {
+            return;
+        }
+        const tick = setInterval(() => {
+            setTimeRemaining((prev) => {
+                const next = Math.max(0, prev - 1);
+                if (next === 0) {
+                    clearInterval(tick);
+                    setPhase('complete');
+                    // Log completion using currentSession snapshot
+                    if (currentSession) {
+                        addOrUpdateLog({
+                            sessionId: currentSession.sessionId,
+                            intakeId: currentSession.intakeId,
+                            target: currentSession.target,
+                            startAt: currentSession.startAt,
+                            endAt: Date.now(),
+                            lengthMinutes: currentSession.lengthMinutes,
+                            completed: true,
+                        });
+                    }
+                }
+                return next;
+            });
+        }, 1000);
+        return () => clearInterval(tick);
+    }, [phase, isPaused, currentSession]);
 
 	// Persist preferred session length
 	useEffect(() => {
@@ -101,50 +144,34 @@ export default function FocusSessionPage() {
 		}
 	}, [sessionLength]);
 
-	// Tick the timer while in focus mode
-	useEffect(() => {
-		if (phase !== 'focus' || isPaused) {
-			return;
-		}
+    const handleStart = () => {
+        // no-op: Focus sessions are started from /lock-in
+    };
 
-		const interval = setInterval(() => {
-			setTimeRemaining((prev) => {
-				if (prev <= 1) {
-					clearInterval(interval);
-					setPhase('complete');
-					return 0;
-				}
-				return prev - 1;
-			});
-		}, 1000);
+    const handlePauseToggle = () => {
+        setIsPaused((prev) => {
+            const next = !prev;
+            if (next) pauseSession(); else resumeSession();
+            return next;
+        });
+    };
 
-		return () => clearInterval(interval);
-	}, [phase, isPaused]);
-
-	const handleStart = () => {
-		const target = targetPreview;
-		if (target.length === 0) {
-			return;
-		}
-
-		setFocusTarget(target);
-		setPhase('focus');
-		setIsPaused(false);
-		setTimeRemaining(sessionLength * 60);
-
-		if (typeof window !== 'undefined') {
-			localStorage.setItem('lastFocusTask', target);
-		}
-	};
-
-	const handlePauseToggle = () => {
-		setIsPaused((prev) => !prev);
-	};
-
-	const handleEndEarly = () => {
-		setPhase('complete');
-		setIsPaused(true);
-	};
+    const handleEndEarly = () => {
+        setPhase('complete');
+        setIsPaused(true);
+        if (currentSession) {
+            addOrUpdateLog({
+                sessionId: currentSession.sessionId,
+                intakeId: currentSession.intakeId,
+                target: currentSession.target,
+                startAt: currentSession.startAt,
+                endAt: Date.now(),
+                lengthMinutes: currentSession.lengthMinutes,
+                completed: false,
+            });
+        }
+        endSession();
+    };
 
 	const handleRestartSelection = () => {
 		setPhase('select');
@@ -155,35 +182,33 @@ export default function FocusSessionPage() {
 		setTimeRemaining(sessionLength * 60);
 	};
 
-	const handleBackToDump = () => {
-		router.push('/brain-dump');
-	};
+    const handleBackToDump = () => {
+        router.push('/lock-in');
+    };
 
-	const handleReflection = () => {
-		router.push('/brain-dump?mode=reflection');
-	};
+    const handleReflection = () => {
+        if (currentSession) {
+            router.push(`/reflection?sessionId=${currentSession.sessionId}`);
+        } else {
+            router.push('/reflection');
+        }
+    };
 
-	if (entries.length === 0 && phase === 'select') {
-		return (
-			<div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-				<div className="max-w-xl text-center space-y-6">
-					<div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mx-auto">
-						<span className="text-4xl">📝</span>
-					</div>
-					<h1 className="text-3xl font-bold">Let&apos;s Capture a Brain Dump First</h1>
-					<p className="text-lg text-gray-400">
-						I couldn&apos;t find a recent brain dump. Offload everything that&apos;s on your mind and then we&apos;ll sprint on what matters.
-					</p>
-					<button
-						onClick={handleBackToDump}
-						className="bg-white text-black font-bold py-4 px-8 rounded-lg text-xl hover:bg-gray-100 transition-colors"
-					>
-						Start Brain Dump
-					</button>
-				</div>
-			</div>
-		);
-	}
+    if (phase === 'select') {
+        return (
+            <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+                <div className="max-w-xl text-center space-y-6">
+                    <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mx-auto">
+                        <span className="text-4xl">⚡</span>
+                    </div>
+                    <h1 className="text-3xl font-bold">Redirecting to Lock-In…</h1>
+                    <p className="text-lg text-gray-400">
+                        We&apos;ll guide you through a quick setup and start the timer.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
 	return (
 		<div className="min-h-screen bg-black text-white">
@@ -301,27 +326,7 @@ export default function FocusSessionPage() {
 										: 'Select or describe what you want to focus on.'}
 								</span>
 							</div>
-							<div className="flex gap-3">
-								<button
-									onClick={handleBackToDump}
-									className="px-4 py-3 rounded-lg border border-gray-700 text-gray-300 hover:border-gray-500 transition-colors"
-									type="button"
-								>
-									Revisit Dump
-								</button>
-								<button
-									onClick={handleStart}
-									disabled={targetPreview.length === 0}
-									className={`px-6 py-3 rounded-lg font-bold transition-colors ${
-										targetPreview.length === 0
-											? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-											: 'bg-white text-black hover:bg-gray-100'
-									}`}
-									type="button"
-								>
-									Start Sprint
-								</button>
-							</div>
+                            <div className="flex gap-3" />
 						</div>
 					</div>
 				)}
