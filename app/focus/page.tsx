@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { getSession, pauseSession, resumeSession, endSession, type FocusSession } from '@/lib/focus-session';
 import { addOrUpdateLog } from '@/lib/lockin-logs';
 
@@ -40,7 +40,6 @@ const formatTime = (seconds: number) => {
 
 export default function FocusSessionPage() {
     const router = useRouter();
-    const searchParams = useSearchParams();
 	const [phase, setPhase] = useState<SessionPhase>('select');
 	const [entries, setEntries] = useState<Suggestion[]>([]);
 	const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -229,9 +228,7 @@ export default function FocusSessionPage() {
 						<div className="text-3xl font-mono font-bold text-green-400">
 							{formatTime(timeRemaining)}
 						</div>
-						<div className="text-sm text-gray-400">
-							{phase === 'select' ? 'Session Length' : isPaused ? 'Paused' : 'Time Remaining'}
-						</div>
+                        <div className="text-sm text-gray-400">{isPaused ? 'Paused' : 'Time Remaining'}</div>
 					</div>
 				</div>
 			</div>
