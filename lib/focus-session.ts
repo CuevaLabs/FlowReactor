@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 
 export type FocusSession = {
     sessionId: string;
@@ -15,6 +15,7 @@ const KEY = "focusSession";
 
 let memorySession: FocusSession | null = null;
 const listeners = new Set<() => void>();
+let storageListenerAttached = false;
 
 function notifyAll() {
     listeners.forEach((listener) => {
@@ -26,20 +27,31 @@ function notifyAll() {
     });
 }
 
-function emitChange() {
-    notifyAll();
+function ensureStorageListener() {
+    if (storageListenerAttached || typeof window === "undefined") return;
+    storageListenerAttached = true;
+    window.addEventListener("storage", (event) => {
+        if (event.key && event.key !== KEY) return;
+        memorySession = readFromStorage();
+        notifyAll();
+    });
 }
 
-export function getSession(): FocusSession | null {
-    if (typeof window === "undefined") return null;
+function readFromStorage(): FocusSession | null {
+    if (typeof window === 'undefined') return memorySession;
     try {
-        const raw = localStorage.getItem(KEY);
+        const raw = window.localStorage.getItem(KEY);
         const parsed = raw ? (JSON.parse(raw) as FocusSession) : null;
         memorySession = parsed;
         return parsed;
     } catch {
         return memorySession;
     }
+}
+
+export function getSession(): FocusSession | null {
+    if (typeof window === "undefined") return null;
+    return readFromStorage();
 }
 
 export function setSession(session: FocusSession | null) {
@@ -51,7 +63,7 @@ export function setSession(session: FocusSession | null) {
     } catch {
         // ignore quota or access errors
     }
-    emitChange();
+    notifyAll();
 }
 
 export function startSession(target: string, lengthMinutes: number, intakeId?: string) {
@@ -90,25 +102,32 @@ export function resumeSession() {
 export function subscribeSession(callback: () => void) {
     if (typeof window === "undefined") return () => {};
     listeners.add(callback);
-    const handler = (event: StorageEvent) => {
-        if (!event.key || event.key === KEY) {
-            getSession(); // refresh memory snapshot
-            notifyAll();
-        }
-    };
-    window.addEventListener("storage", handler);
+    ensureStorageListener();
+    // deliver current snapshot immediately for new subscribers
+    try {
+        callback();
+    } catch {
+        // ignore subscriber errors
+    }
     return () => {
         listeners.delete(callback);
-        window.removeEventListener("storage", handler);
     };
 }
 
 export function useFocusSession(): FocusSession | null {
-    return useSyncExternalStore(
-        subscribeSession,
-        () => getSession(),
-        () => memorySession,
-    );
+    const [session, setSessionState] = useState<FocusSession | null>(() => {
+        if (typeof window === 'undefined') return memorySession;
+        return readFromStorage();
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const sync = () => setSessionState(readFromStorage());
+        const unsubscribe = subscribeSession(sync);
+        return unsubscribe;
+    }, []);
+
+    return session;
 }
 
 export function cryptoRandomId(): string {
