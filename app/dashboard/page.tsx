@@ -11,6 +11,12 @@ import {
 	getLogs,
 	type SessionLog,
 } from '@/lib/lockin-logs';
+import { computeProgress, ROLE_THRESHOLDS } from '@/lib/lockin-progress';
+import {
+	computeFocusVsCommunityRatio,
+	getCommunityBaseline,
+	saveCommunityBaseline,
+} from '@/lib/community-insights';
 
 type SessionWithIntake = {
 	log: SessionLog;
@@ -27,9 +33,12 @@ const QUESTION_LABELS: Record<string, string> = {
 };
 
 export default function LockInDashboard() {
-    const router = useRouter();
+	const router = useRouter();
 	const [intakes, setIntakes] = useState<IntakeAnswers[]>([]);
 	const [logs, setLogs] = useState<SessionLog[]>([]);
+	const [baseline, setBaseline] = useState(() => getCommunityBaseline());
+	const [unlockState, setUnlockState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+	const [unlockMessage, setUnlockMessage] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -58,16 +67,52 @@ export default function LockInDashboard() {
 		}));
 	}, [intakes, logs]);
 
-	const totalMinutes = useMemo(
-		() => history.reduce((acc, entry) => acc + entry.log.lengthMinutes, 0),
-		[history],
-	);
+	const totals = useMemo(() => computeProgress(logs), [logs]);
 
 	const completionRate = useMemo(() => {
 		if (history.length === 0) return 0;
 		const completed = history.filter((entry) => entry.log.completed).length;
 		return Math.round((completed / history.length) * 100);
 	}, [history]);
+
+	const latestSession = history[0]?.log ?? null;
+	const focusVsCommunity = useMemo(() => {
+		if (!latestSession) return null;
+		return computeFocusVsCommunityRatio(latestSession.lengthMinutes, baseline.baselineMinutes);
+	}, [latestSession, baseline.baselineMinutes]);
+
+	const handleBaselineUpdate = (minutes: number) => {
+		const next = saveCommunityBaseline(minutes);
+		setBaseline(next);
+	};
+
+	const roleToSync = totals.currentRole;
+	const canSyncRole = totals.totalXP > 0;
+
+	const handleRoleSync = async () => {
+		if (!canSyncRole) return;
+		setUnlockState('loading');
+		setUnlockMessage(null);
+		try {
+			const response = await fetch('/api/roles/unlock', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					roleKey: roleToSync.key,
+					roleLabel: roleToSync.label,
+					xp: totals.totalXP,
+				}),
+			});
+			const result = await response.json();
+			if (!response.ok) throw new Error(result?.message ?? 'Unable to sync role');
+			setUnlockState('success');
+			setUnlockMessage(result?.message ?? 'Role synced to Whop');
+		} catch (error) {
+			console.error('[lock-in] role sync error', error);
+			setUnlockState('error');
+			setUnlockMessage(error instanceof Error ? error.message : 'Unable to sync role');
+		}
+	};
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-white">
@@ -98,41 +143,105 @@ export default function LockInDashboard() {
 					</div>
 				</header>
 
-				<section className="mt-10 grid gap-6 md:grid-cols-3">
-					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
-							Sessions
-						</div>
-						<div className="mt-4 text-4xl font-semibold text-white">
-							{history.length}
-						</div>
-						<p className="mt-2 text-sm text-slate-300">
-							Lifetime guided sprints captured with Lock-In.
-						</p>
+			<section className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Total XP</div>
+					<div className="mt-4 text-4xl font-semibold text-white">{totals.totalXP}</div>
+					<p className="mt-2 text-sm text-slate-300">Self-awarded XP across lock-ins.</p>
+				</div>
+				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Deep Work Minutes</div>
+					<div className="mt-4 text-4xl font-semibold text-white">{totals.totalMinutes}</div>
+					<p className="mt-2 text-sm text-slate-300">Total focused minutes logged.</p>
+				</div>
+				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Streak</div>
+					<div className="mt-4 text-4xl font-semibold text-white">{totals.streakDays}d</div>
+					<p className="mt-2 text-sm text-slate-300">Consecutive days with at least one lock-in.</p>
+				</div>
+				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Completion Rate</div>
+					<div className="mt-4 text-4xl font-semibold text-white">{completionRate}%</div>
+					<p className="mt-2 text-sm text-slate-300">Sprint sessions that finished the timer.</p>
+				</div>
+			</section>
+
+			<section className="mt-12 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Role Progress</div>
+					<h2 className="mt-3 text-2xl font-semibold text-white">{totals.currentRole.label}</h2>
+					<p className="mt-2 text-sm text-slate-300">{totals.currentRole.description}</p>
+					<div className="mt-6 space-y-3">
+						{ROLE_THRESHOLDS.map((role) => {
+							const unlocked = totals.totalXP >= role.xp;
+							return (
+								<div key={role.key} className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm">
+									<div>
+										<div className="font-semibold text-white/90">{role.label}</div>
+										<div className="text-[11px] uppercase tracking-[0.3em] text-slate-500">{role.xp} XP</div>
+									</div>
+									<div className={`text-xs font-semibold ${unlocked ? 'text-cyan-300' : 'text-slate-500'}`}>
+										{unlocked ? 'Unlocked' : 'Locked'}
+									</div>
+								</div>
+							);
+						})}
 					</div>
-					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
-							Completion Rate
+					<button
+						type="button"
+						onClick={handleRoleSync}
+						disabled={!canSyncRole || unlockState === 'loading'}
+						className={`mt-6 rounded-full px-5 py-2 text-sm font-semibold transition ${
+							canSyncRole
+								? 'bg-cyan-400 text-slate-900 shadow shadow-cyan-400/40 hover:bg-cyan-300'
+								: 'bg-white/10 text-slate-400 cursor-not-allowed'
+						}`}
+					>
+						{unlockState === 'loading' ? 'Syncing…' : `Sync ${roleToSync.label} to Whop`}
+					</button>
+					{unlockMessage && (
+						<div className={`mt-3 text-xs ${unlockState === 'success' ? 'text-emerald-300' : 'text-red-300'}`}>
+							{unlockMessage}
 						</div>
-						<div className="mt-4 text-4xl font-semibold text-white">
-							{completionRate}%
-						</div>
-						<p className="mt-2 text-sm text-slate-300">
-							How often you stayed in the seat until the timer ended.
-						</p>
+					)}
+				</div>
+
+				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Community Comparison</div>
+					<h2 className="mt-3 text-2xl font-semibold text-white">Lock-In vs Community Time</h2>
+					<p className="mt-2 text-sm text-slate-300">
+						Set how much time you typically spend in community chats. We’ll compare your latest lock-in against it.
+					</p>
+					<div className="mt-6">
+						<label className="text-xs uppercase tracking-[0.3em] text-slate-400" htmlFor="baselineMinutes">
+							Community baseline (minutes)
+						</label>
+						<input
+							id="baselineMinutes"
+							type="range"
+							min={5}
+							max={120}
+							value={baseline.baselineMinutes}
+							onChange={(event) => handleBaselineUpdate(Number.parseInt(event.target.value, 10))}
+							className="mt-3 w-full accent-cyan-400"
+						/>
+						<div className="mt-2 text-sm text-slate-200">{baseline.baselineMinutes} minutes per day in community</div>
 					</div>
-					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">
-							Deep Work Minutes
+					{latestSession ? (
+						<div className="mt-6 rounded-3xl border border-white/10 bg-slate-950/60 p-5 text-sm text-slate-200 shadow-inner">
+							<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Latest session</div>
+							<p className="mt-3 text-base text-white">Focused {latestSession.lengthMinutes} minutes on “{latestSession.target}”.</p>
+							<p className="mt-2 text-sm text-slate-300">
+								This is {focusVsCommunity ? `${focusVsCommunity}x` : '—'} your community baseline.
+							</p>
 						</div>
-						<div className="mt-4 text-4xl font-semibold text-white">
-							{totalMinutes}
+					) : (
+						<div className="mt-6 rounded-3xl border border-white/10 bg-slate-950/60 p-5 text-sm text-slate-300">
+							Start a lock-in to see comparisons here.
 						</div>
-						<p className="mt-2 text-sm text-slate-300">
-							Total minutes captured across all recorded lock-ins.
-						</p>
-					</div>
-				</section>
+					)}
+				</div>
+			</section>
 
 				<section className="mt-12 space-y-6">
 					<h2 className="text-2xl font-semibold text-white">Guided Intake Archive</h2>
