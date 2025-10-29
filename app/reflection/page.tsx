@@ -15,6 +15,8 @@ function ReflectionContent() {
     const [summary, setSummary] = useState(() => log?.reflection?.summary ?? '');
     const [distractions, setDistractions] = useState(() => log?.reflection?.distractionsNoted ?? '');
     const [nextStep, setNextStep] = useState(() => log?.reflection?.nextStep ?? '');
+    const [completionPercent, setCompletionPercent] = useState<number>(() => log?.completionPercent ?? 80);
+    const [xpAwarded, setXpAwarded] = useState<number>(() => log?.xpAwarded ?? 50);
 
     const alignmentScore = useMemo(() => {
         if (!intake || !summary) return undefined;
@@ -40,6 +42,8 @@ function ReflectionContent() {
         }
         addOrUpdateLog({
             ...log,
+            completionPercent,
+            xpAwarded,
             reflection: {
                 summary,
                 distractionsNoted: distractions || undefined,
@@ -99,6 +103,41 @@ function ReflectionContent() {
                 )}
 
                 <section className="mt-10 space-y-8">
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                        <h2 className="text-lg font-semibold text-white">How did it go?</h2>
+                        <div className="mt-6 grid gap-6 sm:grid-cols-2">
+                            <div>
+                                <label className="text-xs uppercase tracking-[0.3em] text-slate-400" htmlFor="completion">
+                                    Completion %
+                                </label>
+                                <input
+                                    id="completion"
+                                    type="range"
+                                    min={0}
+                                    max={100}
+                                    value={completionPercent}
+                                    onChange={(event) => setCompletionPercent(Number.parseInt(event.target.value, 10))}
+                                    className="mt-3 w-full accent-cyan-400"
+                                />
+                                <div className="mt-2 text-sm text-slate-200">{completionPercent}% of the goal shipped</div>
+                            </div>
+                            <div>
+                                <label className="text-xs uppercase tracking-[0.3em] text-slate-400" htmlFor="xp">
+                                    XP Earned
+                                </label>
+                                <input
+                                    id="xp"
+                                    type="range"
+                                    min={1}
+                                    max={100}
+                                    value={xpAwarded}
+                                    onChange={(event) => setXpAwarded(Number.parseInt(event.target.value, 10))}
+                                    className="mt-3 w-full accent-cyan-400"
+                                />
+                                <div className="mt-2 text-sm text-slate-200">{xpAwarded} XP self-awarded</div>
+                            </div>
+                        </div>
+                    </div>
                     <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-inner shadow-black/40 backdrop-blur">
                         <h2 className="text-lg font-semibold text-white">What actually happened?</h2>
                         <p className="mt-1 text-sm text-slate-400">

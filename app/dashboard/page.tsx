@@ -155,10 +155,16 @@ export default function LockInDashboard() {
 											<div className="mt-2 text-xl font-semibold text-white">
 												{log.target}
 											</div>
-											<div className="mt-1 text-xs text-slate-500">
-												{new Date(log.startAt).toLocaleString()} • {log.lengthMinutes} min
-											</div>
-										</div>
+						<div className="mt-1 text-xs text-slate-500">
+							{new Date(log.startAt).toLocaleString()} • {log.lengthMinutes} min
+						</div>
+						<div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-[0.25em] text-slate-500">
+							<span>
+								Completion {typeof log.completionPercent === 'number' ? `${log.completionPercent}%` : '—'}
+							</span>
+							<span>XP {log.xpAwarded ?? 0}</span>
+						</div>
+					</div>
 										<div className="flex gap-2 text-xs text-slate-400">
                                             <button
                                                 type="button"

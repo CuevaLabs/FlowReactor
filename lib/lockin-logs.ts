@@ -6,6 +6,8 @@ export type SessionLog = {
     endAt: number;
     lengthMinutes: number;
     completed: boolean;
+    completionPercent?: number; // self-rated completion 0-100
+    xpAwarded?: number; // XP assigned for habit loop reinforcement
     // Reflection summaries (not raw intake)
     reflection?: {
         summary: string;
@@ -55,4 +57,3 @@ function setLogs(items: SessionLog[]) {
         // ignore storage errors
     }
 }
-
