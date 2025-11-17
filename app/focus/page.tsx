@@ -1,16 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { addOrUpdateLog, getLog, type ReactorSessionLog } from '@/lib/flow-reactor-logs';
-import { endSession, getSessionRemainingSeconds, useFlowReactorSession } from '@/lib/flow-reactor-session';
-import { getIntake } from '@/lib/flow-reactor-intake';
-
-const formatTime = (seconds: number) => {
-	const mins = Math.floor(seconds / 60);
-	const secs = seconds % 60;
-	return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { addOrUpdateLog, getLog, type ReactorSessionLog } from "@/lib/flow-reactor-logs";
+import { endSession, getSessionRemainingSeconds, useFlowReactorSession } from "@/lib/flow-reactor-session";
+import { getIntake } from "@/lib/flow-reactor-intake";
+import { FocusTimer } from "@/components/FocusTimer";
 
 export default function FocusPage() {
 	const router = useRouter();
@@ -19,8 +14,8 @@ export default function FocusPage() {
 	const hasRedirected = useRef(false);
 
 	useEffect(() => {
-		const tick = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(tick);
+		const tick = window.setInterval(() => setNow(Date.now()), 1000);
+		return () => window.clearInterval(tick);
 	}, []);
 
 	useEffect(() => {
@@ -28,10 +23,9 @@ export default function FocusPage() {
 			hasRedirected.current = false;
 			return;
 		}
-		if (typeof window === 'undefined') return;
 		if (!hasRedirected.current) {
 			hasRedirected.current = true;
-			router.replace('/reactor');
+			router.replace("/reactor");
 		}
 	}, [session, router]);
 
@@ -67,16 +61,14 @@ export default function FocusPage() {
 
 		if (!hasRedirected.current) {
 			hasRedirected.current = true;
-			router.push(session.intakeId ? `/reflection?sessionId=${session.sessionId}` : '/reflection');
+			router.push(session.intakeId ? `/reflection?sessionId=${session.sessionId}` : "/reflection");
 		}
 	}, [session, secondsRemaining, router]);
 
 	if (!session) {
 		return (
-			<div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-slate-200">
-				<div className="text-sm uppercase tracking-[0.3em] text-slate-400">
-					Preparing your reactor...
-				</div>
+			<div className="flex min-h-screen items-center justify-center bg-reactor-bg text-cyan-200">
+				<div className="text-sm uppercase tracking-[0.45em]">Stabilizing containment...</div>
 			</div>
 		);
 	}
@@ -107,110 +99,77 @@ export default function FocusPage() {
 
 		if (!hasRedirected.current) {
 			hasRedirected.current = true;
-			router.push('/reflection');
+			router.push("/reflection");
 		}
 	};
 
-	const endTime = new Date(session.endAt).toLocaleTimeString();
-
 	return (
-		<div className="relative min-h-screen overflow-hidden bg-[#020617] text-white">
-			<div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.15),transparent_55%),radial-gradient(circle_at_bottom,_rgba(99,102,241,0.18),transparent_50%)]" />
-			<div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 sm:px-12">
-				<header className="flex flex-col gap-6 pt-4 md:flex-row md:items-start md:justify-between">
+		<div className="relative min-h-screen overflow-hidden bg-reactor-bg text-white">
+			<div className="pointer-events-none absolute inset-0">
+				<div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(0,255,157,0.15),transparent_50%),radial-gradient(circle_at_bottom,_rgba(255,59,92,0.25),transparent_55%)]" />
+				<div className="absolute inset-0 border border-white/5" />
+			</div>
+			<div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-6 py-12 sm:px-10 lg:px-16">
+				<header className="flex flex-col gap-4 border-b border-white/10 pb-6 text-left md:flex-row md:items-end md:justify-between">
 					<div>
-						<div className="text-xs uppercase tracking-[0.35em] text-slate-400">Flow Reactor Active</div>
-						<h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">{session.target}</h1>
-						<p className="mt-3 text-sm text-slate-300">
-							{session.lengthMinutes} minute activation • Ends {endTime}
+						<p className="text-xs uppercase tracking-[0.65em] text-cyan-300">Containment Chamber</p>
+						<h1 className="mt-4 text-3xl font-semibold text-white sm:text-4xl">{session.target}</h1>
+						<p className="mt-2 text-sm text-cyan-100/70">
+							{session.lengthMinutes} minute ignition • Ends {new Date(session.endAt).toLocaleTimeString()}
 						</p>
 					</div>
 					<button
 						type="button"
 						onClick={handleEndEarly}
-						className="self-start rounded-full border border-red-400/60 px-5 py-2 text-sm font-semibold text-red-200 transition hover:border-red-300 hover:text-red-100"
+						className="self-start rounded-full border border-reactor-hot/60 px-5 py-2 text-sm font-semibold text-reactor-hot transition hover:border-white hover:text-white"
 					>
-						End Early
+						Emergency shutdown
 					</button>
 				</header>
 
-				<main className="flex flex-1 flex-col items-center justify-center gap-12 text-center">
-					<div className="space-y-6">
-						<div className="text-xs uppercase tracking-[0.4em] text-slate-500">Time Remaining</div>
-						<div className="text-[clamp(3.5rem,12vw,9rem)] font-semibold tracking-tight text-white">
-							{formatTime(secondsRemaining)}
+				<main className="grid flex-1 gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+					<section className="flex flex-col items-center justify-center gap-8 rounded-[36px] border border-white/5 bg-reactor-panel/60 p-6 backdrop-blur">
+						<FocusTimer session={session} />
+						<div className="text-center text-sm text-cyan-200/80">
+							<div className="text-xs uppercase tracking-[0.4em] text-white/70">Reactor output</div>
+							<p className="mt-2 text-lg font-semibold text-white">{progress}% stabilized</p>
 						</div>
-						<div className="mx-auto h-2 w-full max-w-xl overflow-hidden rounded-full bg-white/10">
-							<div
-								className="h-full bg-cyan-400 transition-all"
-								style={{ width: `${progress}%` }}
-							/>
-						</div>
-						<div className="text-xs uppercase tracking-[0.3em] text-slate-500">{progress}% complete</div>
-					</div>
+					</section>
 
-					{intake && (
-						<div className="grid w-full max-w-4xl gap-6 text-left sm:grid-cols-2">
-							<div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
-								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Flow plan</div>
-								<div className="mt-4 space-y-4 text-sm text-slate-200">
-									{Object.entries(intake.answers).slice(0, 2).map(([key, value]) => (
-										<div key={key}>
-											<div className="text-slate-400">{key}</div>
-											<p className="mt-1 text-base text-white">{value || '—'}</p>
-										</div>
-									))}
-								</div>
-							</div>
-							<div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
-								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Ignition sequence</div>
-								<div className="mt-4 space-y-4 text-sm text-slate-200">
-									{Object.entries(intake.answers).slice(2).map(([key, value]) => (
-										<div key={key}>
-											<div className="text-slate-400">{key}</div>
-											<p className="mt-1 text-white/90">{value || '—'}</p>
-										</div>
-									))}
-								</div>
-							</div>
+					<section className="space-y-6 rounded-[36px] border border-white/5 bg-white/5 p-6 text-left backdrop-blur">
+						<div>
+							<p className="text-xs uppercase tracking-[0.45em] text-cyan-200">Ignition Data</p>
+							<ul className="mt-4 space-y-3 text-sm text-white/80">
+								<li>Session ID: {session.sessionId.slice(0, 8)}...</li>
+								<li>Flow type: {session.flowType ?? "—"}</li>
+								<li>Intake Linked: {session.intakeId ? "Yes" : "No"}</li>
+							</ul>
 						</div>
-					)}
+						{intake && (
+							<div className="rounded-2xl border border-white/10 bg-reactor-shield/50 p-4">
+								<div className="text-xs uppercase tracking-[0.4em] text-reactor-core">Ignition Notes</div>
+								<div className="mt-3 space-y-3 text-sm text-cyan-50/90">
+									{Object.entries(intake.answers).map(([key, value]) => (
+										<div key={key}>
+											<p className="text-[11px] uppercase tracking-[0.4em] text-white/60">{key}</p>
+											<p className="text-base text-white">{value || "—"}</p>
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+						<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-cyan-100/80">
+							<p className="text-xs uppercase tracking-[0.4em] text-white/60">Ritual</p>
+							<ul className="mt-3 space-y-2">
+								<li>Inhale 4 • Hold 4 • Exhale 6 to stabilize.</li>
+								<li>Seal all hatches (notifications, tabs, alerts).</li>
+								<li>Check alignment midway and adjust without judgment.</li>
+							</ul>
+						</div>
+					</section>
 				</main>
-
-				<footer className="flex flex-col gap-6 pb-10 pt-12 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Ritual</div>
-						<ul className="mt-3 space-y-2 text-sm text-slate-300">
-							<li>Breathe in for 4, hold for 4, out for 6 to drop in.</li>
-							<li>Close or snooze anything outside today’s target.</li>
-							<li>Check alignment halfway and adjust without judgment.</li>
-						</ul>
-					</div>
-					<div className="flex flex-wrap items-center gap-3">
-						<button
-							type="button"
-							onClick={() => router.push('/reflection')}
-							className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-						>
-							Jump to Reflection
-						</button>
-						<button
-							type="button"
-							onClick={() => router.push('/logs')}
-							className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-						>
-							Review Past Sessions
-						</button>
-						<button
-							type="button"
-							onClick={() => router.push('/dashboard')}
-							className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40"
-						>
-							Insights Dashboard
-						</button>
-					</div>
-				</footer>
 			</div>
 		</div>
 	);
 }
+
