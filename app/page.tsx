@@ -2,275 +2,213 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { ReactorSelector } from "@/components/ReactorSelector";
-import { ReactorButton } from "@/components/ReactorButton";
+import { useEffect, useState } from "react";
 import { FlowType } from "@/lib/flow-reactor-types";
 import { getUserFlowType, setUserFlowType } from "@/lib/flow-type-storage";
 import { useFlowReactorSession } from "@/lib/flow-reactor-session";
-import { getLogs, type ReactorSessionLog } from "@/lib/flow-reactor-logs";
+import { ReactorButton } from "@/components/ReactorButton";
 
-type NavigationCard = {
+type ModuleDescriptor = {
+	key: "navigation" | "reactor" | "active" | "logs";
 	title: string;
 	description: string;
+	signal: string;
+	cta: string;
 	href: string;
-	icon: string;
-	accent: string;
+	steps: string[];
 };
 
-const NAVIGATION: NavigationCard[] = [
+const MODULES: ModuleDescriptor[] = [
 	{
-		title: "Dashboard",
-		description: "Track streak, XP, and ignition consistency.",
+		key: "navigation",
+		title: "Mission Navigation",
+		description: "The living map. Decide if you need guidance, insights, or community support before entering the chamber.",
+		signal: "Scan the field",
+		cta: "Open Dashboard",
 		href: "/dashboard",
-		icon: "📊",
-		accent: "from-cyan-400/60 to-blue-500/40",
+		steps: [
+			"Check streak, XP, and alignment stats.",
+			"Decide where to route your attention.",
+			"Use role unlocks to sync back to Whop.",
+		],
 	},
 	{
-		title: "Reactor Control",
-		description: "Guided intake to start a fresh mission.",
+		key: "reactor",
+		title: "Ignition Bay",
+		description: "Guided intake questions narrow the mission and set a timer. This is where priming begins.",
+		signal: "Prime a core",
+		cta: "Start guided intake",
 		href: "/reactor",
-		icon: "🛰️",
-		accent: "from-rose-400/60 to-orange-500/40",
+		steps: [
+			"Pick the block you’re solving (Momentum, Shield, etc.).",
+			"Answer three prompts to aim the beam.",
+			"Lock the duration and ignite.",
+		],
 	},
 	{
-		title: "Community",
-		description: "Swap intel with the rest of the squad.",
-		href: "/community",
-		icon: "💬",
-		accent: "from-emerald-400/60 to-teal-500/40",
+		key: "active",
+		title: "Active Reactor",
+		description: "Once lit, your focus timer, shield, and rituals live here. This keeps you in the chamber.",
+		signal: "Hold containment",
+		cta: "Enter containment",
+		href: "/focus",
+		steps: [
+			"Monitor the main timer + shield warnings.",
+			"Log friction mid-session if something breaches.",
+			"Emergency exit routes you to reflection.",
+		],
 	},
 	{
-		title: "Logs",
-		description: "Review previous reactors and reflections.",
+		key: "logs",
+		title: "Archive & Reflections",
+		description: "Every session writes to the logbook. Capture reflections to see patterns and award XP.",
+		signal: "Integrate",
+		cta: "Review logbook",
 		href: "/logs",
-		icon: "📓",
-		accent: "from-purple-400/60 to-indigo-500/40",
+		steps: [
+			"Record what shipped and what pulled you away.",
+			"Award completion % + XP.",
+			"Compare intent vs. outcome via alignment score.",
+		],
 	},
 ];
 
 export default function HomePage() {
 	const router = useRouter();
 	const session = useFlowReactorSession();
-	const [selected, setSelected] = useState<FlowType | null>(null);
-	const [logs, setLogs] = useState<ReactorSessionLog[]>([]);
+	const [selectedModule, setSelectedModule] = useState<ModuleDescriptor>(MODULES[0]!);
+	const [preferredType, setPreferredType] = useState<FlowType | null>(null);
 
 	useEffect(() => {
-		setSelected(getUserFlowType());
+		setPreferredType(getUserFlowType());
 	}, []);
 
-	useEffect(() => {
-		if (typeof window === "undefined") return;
-		const hydrate = () => setLogs(getLogs());
-		hydrate();
-		const onStorage = (event: StorageEvent) => {
-			if (!event.key || event.key.startsWith("flowReactor:")) hydrate();
-		};
-		window.addEventListener("storage", onStorage);
-		return () => window.removeEventListener("storage", onStorage);
-	}, []);
-
-	const startFlow = () => {
-		if (!selected) return;
-		setUserFlowType(selected);
+	const handleQuickStart = () => {
+		if (preferredType) {
+			setUserFlowType(preferredType);
+		}
 		router.push("/reactor");
 	};
 
-	const scrollToIgnition = () => {
-		if (typeof window === "undefined") return;
-		document.getElementById("ignite")?.scrollIntoView({ behavior: "smooth", block: "start" });
-	};
-
-	const heroCopy = useMemo(() => {
-		if (selected) {
-			return `Core ${selected.replace("TYPE_", "")} is primed. Sync with reactor control or change course below.`;
-		}
-		return "Mission control unifies everything: dashboard intel, community hails, and your most recent reactor burns.";
-	}, [selected]);
-
-	const recentLogs = useMemo(() => {
-		return logs
-			.slice()
-			.sort((a, b) => b.startAt - a.startAt)
-			.slice(0, 3);
-	}, [logs]);
-
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-white">
-			<div className="mx-auto w-full max-w-6xl px-6 py-12 sm:px-10 lg:px-14">
-				<header className="rounded-[40px] border border-white/10 bg-white/[0.04] px-6 py-10 text-center shadow-[0_0_120px_rgba(15,23,42,0.45)] backdrop-blur">
+			<div className="mx-auto w-full max-w-5xl px-6 py-12 sm:px-10 lg:px-12">
+				<section className="rounded-[40px] border border-white/10 bg-white/[0.05] px-6 py-10 text-center shadow-[0_0_120px_rgba(15,23,42,0.45)] backdrop-blur">
 					<p className="text-xs uppercase tracking-[0.8em] text-cyan-300">Flow Reactor Control Deck</p>
-					<h1 className="mt-6 text-4xl font-semibold text-white sm:text-5xl md:text-6xl">
-						Welcome back to mission control
+					<h1 className="mt-6 text-4xl font-semibold text-white sm:text-5xl">
+						Orient before you fire anything up
 					</h1>
-					<p className="mx-auto mt-4 max-w-3xl text-base text-slate-300 md:text-lg">{heroCopy}</p>
+					<p className="mx-auto mt-4 max-w-3xl text-base text-slate-300 md:text-lg">
+						This hero view walks you through every module. Tap a button to inspect it, then commit to the one move that matters.
+					</p>
 					<div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+						<ReactorButton onClick={handleQuickStart} disabled={false}>
+							{preferredType ? `Run ${preferredType.replace("TYPE_", "")} protocol` : "Start guidance"}
+						</ReactorButton>
 						<button
 							type="button"
-							onClick={() => (session ? router.push("/focus") : router.push("/dashboard"))}
-							className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow shadow-cyan-400/50 transition hover:bg-cyan-300"
+							onClick={() => router.push("/dashboard")}
+							className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/60"
 						>
-							{session ? "Resume containment" : "View dashboard"}
+							Snapshot my status
 						</button>
-						<Link
-							href="/reactor"
-							className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/50"
-						>
-							Skip to intake
-						</Link>
 					</div>
-				</header>
-
-				<main className="mt-12 space-y-10">
-					<section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-						<div className="rounded-[32px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-xs uppercase tracking-[0.6em] text-cyan-200">Mission Navigation</p>
-									<h2 className="mt-3 text-2xl font-semibold text-white">Where do you need to go?</h2>
-								</div>
-								<Link href="/dashboard" className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400 hover:text-white">
-									View all
-								</Link>
+					{session && (
+						<div className="mt-8 grid gap-4 rounded-[32px] border border-reactor-core/30 bg-reactor-panel/50 p-6 text-left text-cyan-100">
+							<div className="text-xs uppercase tracking-[0.4em] text-reactor-core">Active reactor detected</div>
+							<p className="text-2xl font-semibold text-white">{session.target}</p>
+							<p className="text-sm text-cyan-100/80">
+								{session.lengthMinutes} minute ignition • Started {new Date(session.startAt).toLocaleTimeString()}
+							</p>
+							<div className="flex flex-wrap gap-3">
+								<button
+									type="button"
+									onClick={() => router.push("/focus")}
+									className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+								>
+									Resume containment
+								</button>
+								<button
+									type="button"
+									onClick={() => router.push("/reflection")}
+									className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-white transition hover:border-white/60"
+								>
+									Log reflections
+								</button>
 							</div>
-							<div className="mt-6 grid gap-4 md:grid-cols-2">
-								{NAVIGATION.map((card) => (
-									<Link
-										key={card.href}
-										href={card.href}
-										className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/60 p-5 transition hover:border-cyan-300/50"
+						</div>
+					)}
+				</section>
+
+				<section className="mt-12 rounded-[32px] border border-white/10 bg-white/5 p-6 text-left backdrop-blur">
+					<p className="text-xs uppercase tracking-[0.6em] text-cyan-200">Flight checklist</p>
+					<h2 className="mt-3 text-2xl font-semibold text-white">Your cadence every time you arrive</h2>
+					<div className="mt-6 grid gap-4 sm:grid-cols-2">
+						{["Scan your dashboard for patterns.", "Prime your reactor with a single intent.", "Hold the chamber until the timer ends.", "Debrief, log XP, and course-correct."].map(
+							(entry, index) => (
+								<div key={entry} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+									<div className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-500">Step {index + 1}</div>
+									<p className="mt-2 text-sm text-slate-200">{entry}</p>
+								</div>
+							)
+						)}
+					</div>
+				</section>
+
+				<section className="mt-10 grid gap-6 rounded-[32px] border border-white/10 bg-slate-950/60 p-6 text-left shadow-inner shadow-black/60 lg:grid-cols-[0.9fr_1.1fr]">
+					<div>
+						<p className="text-xs uppercase tracking-[0.6em] text-cyan-200">Mission modules</p>
+						<h2 className="mt-3 text-2xl font-semibold text-white">Tap to inspect</h2>
+						<div className="mt-6 space-y-3">
+							{MODULES.map((module) => {
+								const isActive = module.key === selectedModule.key;
+								return (
+									<button
+										type="button"
+										key={module.key}
+										onClick={() => setSelectedModule(module)}
+										className={`flex w-full flex-col rounded-2xl border px-4 py-4 text-left transition ${
+											isActive ? "border-cyan-400/60 bg-cyan-500/10 shadow shadow-cyan-400/30" : "border-white/10 bg-white/5 hover:border-white/20"
+										}`}
 									>
-										<div className="flex items-center justify-between text-sm">
-											<span className="text-2xl">{card.icon}</span>
-											<span className="text-[10px] uppercase tracking-[0.4em] text-slate-500">Navigate</span>
-										</div>
-										<h3 className="mt-3 text-xl font-semibold">{card.title}</h3>
-										<p className="mt-2 text-sm text-slate-300">{card.description}</p>
-										<div className="mt-4 inline-flex items-center text-xs font-semibold text-cyan-200">
-											<span>Enter</span>
-											<span className="ml-2 text-base">→</span>
-										</div>
-										<div className={`pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br ${card.accent} opacity-0 blur-2xl transition duration-500 hover:opacity-70`} />
-									</Link>
-								))}
-							</div>
+										<div className="text-xs uppercase tracking-[0.4em] text-slate-400">{module.signal}</div>
+										<div className="mt-2 text-lg font-semibold text-white">{module.title}</div>
+										<p className="mt-2 text-sm text-slate-300">{module.description}</p>
+									</button>
+								);
+							})}
 						</div>
+					</div>
 
-						<div className="flex flex-col justify-between rounded-[32px] border border-white/10 bg-slate-950/50 p-6 text-left shadow-inner shadow-black/60">
-							<p className="text-xs uppercase tracking-[0.6em] text-cyan-200">Active Reactor</p>
-							{session ? (
-								<>
-									<h2 className="mt-3 text-2xl font-semibold text-white">{session.target}</h2>
-									<p className="mt-2 text-sm text-slate-300">
-										{session.lengthMinutes} min ignition • Started {new Date(session.startAt).toLocaleTimeString()}
-									</p>
-									<div className="mt-5 flex flex-wrap gap-3">
-										<button
-											type="button"
-											onClick={() => router.push("/focus")}
-											className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-										>
-											Open containment
-										</button>
-										<button
-											type="button"
-											onClick={() => router.push("/reflection")}
-											className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/60"
-										>
-											Log reflections
-										</button>
-									</div>
-								</>
-							) : (
-								<>
-									<h2 className="mt-3 text-2xl font-semibold text-white">No reactor currently live</h2>
-									<p className="mt-2 text-sm text-slate-300">
-										Your chamber is idle. Prime a core below or jump straight into a guided intake sequence.
-									</p>
-									<div className="mt-5 flex flex-wrap gap-3">
-										<button
-											type="button"
-											onClick={scrollToIgnition}
-											className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow shadow-cyan-400/40 transition hover:bg-cyan-300"
-										>
-											Prime a reactor
-										</button>
-										<Link
-											href="/reactor"
-											className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/60"
-										>
-											Run guided intake
-										</Link>
-									</div>
-								</>
-							)}
+					<div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+						<div className="text-xs uppercase tracking-[0.4em] text-cyan-200">Module detail</div>
+						<h3 className="mt-2 text-2xl font-semibold text-white">{selectedModule.title}</h3>
+						<p className="mt-3 text-sm text-slate-200">{selectedModule.description}</p>
+						<ul className="mt-6 space-y-3 text-sm text-slate-200">
+							{selectedModule.steps.map((step) => (
+								<li key={step} className="flex gap-3">
+									<span className="mt-1 h-2 w-2 rounded-full bg-cyan-300" />
+									<span>{step}</span>
+								</li>
+							))}
+						</ul>
+						<div className="mt-8 flex flex-wrap gap-3">
+							<Link
+								href={selectedModule.href}
+								className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-semibold text-slate-900 shadow shadow-cyan-400/50 transition hover:bg-cyan-300"
+							>
+								{selectedModule.cta}
+							</Link>
+							<button
+								type="button"
+								onClick={() => setSelectedModule(MODULES[(MODULES.indexOf(selectedModule) + 1) % MODULES.length]!)}
+								className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/60"
+							>
+								Next module
+							</button>
 						</div>
-					</section>
-
-					<section id="ignite" className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-						<div className="rounded-[32px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-							<div className="flex flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
-								<div>
-									<p className="text-xs uppercase tracking-[0.6em] text-cyan-200">Ignition Bay</p>
-									<h2 className="mt-2 text-2xl font-semibold text-white">Select the right reactor</h2>
-								</div>
-								<p className="text-sm text-slate-400">
-									{selected ? `Core ${selected.replace("TYPE_", "")} highlighted.` : "Choose the issue you need to neutralize."}
-								</p>
-							</div>
-							<div className="mt-6">
-								<ReactorSelector selected={selected} onSelect={setSelected} />
-							</div>
-							<div className="mt-8 flex flex-wrap items-center gap-4">
-								<ReactorButton onClick={startFlow} disabled={!selected}>
-									{selected ? `Ignite Reactor ${selected.replace("TYPE_", "")}` : "Select reactor core"}
-								</ReactorButton>
-								<p className="text-sm uppercase tracking-[0.45em] text-cyan-300/70">
-									Contain distractions. Amplify signal.
-								</p>
-							</div>
-						</div>
-
-						<div className="rounded-[32px] border border-white/10 bg-slate-950/60 p-6">
-							<div className="flex items-center justify-between pb-4">
-								<div>
-									<p className="text-xs uppercase tracking-[0.6em] text-cyan-200">Previous Reactors</p>
-									<h2 className="mt-2 text-2xl font-semibold text-white">Recent ignition logs</h2>
-								</div>
-								<Link href="/logs" className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-400 hover:text-white">
-									View logbook
-								</Link>
-							</div>
-							<div className="space-y-4">
-								{recentLogs.length === 0 ? (
-									<div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-slate-300">
-										No sessions logged yet. Activate a reactor to seed your history.
-									</div>
-								) : (
-									recentLogs.map((log) => (
-										<div key={log.sessionId} className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-slate-200">
-											<div className="flex items-start justify-between gap-3">
-												<div>
-													<div className="text-xs uppercase tracking-[0.4em] text-slate-500">
-														{log.completed ? "Completed run" : "Ended early"}
-													</div>
-													<p className="mt-2 text-base font-semibold text-white">{log.target}</p>
-												</div>
-												<div className="text-right text-xs text-slate-400">
-													<div>{new Date(log.startAt).toLocaleDateString()}</div>
-													<div>{log.lengthMinutes} min</div>
-												</div>
-											</div>
-											{log.reflection?.summary && (
-												<p className="mt-3 text-sm text-slate-300">“{log.reflection.summary}”</p>
-											)}
-										</div>
-									))
-								)}
-							</div>
-						</div>
-					</section>
-				</main>
+					</div>
+				</section>
 			</div>
 		</div>
 	);
