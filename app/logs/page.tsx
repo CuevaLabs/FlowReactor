@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getLogs, type SessionLog } from "@/lib/lockin-logs";
+import { getLogs, type ReactorSessionLog } from "@/lib/flow-reactor-logs";
 
 const formatDateTime = (value: number) =>
 	new Date(value).toLocaleString(undefined, {
@@ -13,7 +13,7 @@ const formatDateTime = (value: number) =>
 	});
 
 export default function LogsPage() {
-	const [logs, setLogs] = useState<SessionLog[]>([]);
+	const [logs, setLogs] = useState<ReactorSessionLog[]>([]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -21,7 +21,7 @@ export default function LogsPage() {
 		hydrate();
 
 		const onStorage = (event: StorageEvent) => {
-			if (!event.key || event.key === "lockin:logs") hydrate();
+			if (!event.key || event.key === "flowReactor:logs") hydrate();
 		};
 
 		window.addEventListener("storage", onStorage);
@@ -56,9 +56,9 @@ const ordered = useMemo(
 						<div className="text-xs uppercase tracking-[0.3em] text-cyan-200">
 							History
 						</div>
-						<h1 className="mt-3 text-4xl font-semibold text-white">Session Logs</h1>
+						<h1 className="mt-3 text-4xl font-semibold text-white">Reactor Session Logs</h1>
 						<p className="mt-2 max-w-2xl text-base text-slate-300">
-							Every Lock-In captured with reflection notes and alignment insights.
+							Every Flow Reactor session captured with reflection notes and alignment insights.
 						</p>
 					</div>
 					<Link
@@ -74,7 +74,7 @@ const ordered = useMemo(
 					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Sessions</div>
 						<div className="mt-3 text-3xl font-semibold text-white">{totals.sessions}</div>
-						<p className="mt-1 text-xs text-slate-400">Lifetime lock-ins captured</p>
+						<p className="mt-1 text-xs text-slate-400">Lifetime reactor sessions captured</p>
 					</div>
 					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Deep Work Minutes</div>
@@ -99,7 +99,7 @@ const ordered = useMemo(
 			<section className="mt-10">
 					{ordered.length === 0 ? (
 						<div className="rounded-3xl border border-white/10 bg-white/5 p-12 text-center text-slate-300">
-							No sessions yet. Start a Lock-In to seed your history.
+							No sessions yet. Start a Flow Reactor session to seed your history.
 						</div>
 					) : (
 						<div className="space-y-4">

@@ -5,10 +5,10 @@
 
 export const appConfig = {
 	// App Branding
-	name: "Lock-In",
-	tagline: "Guide your mind. Block distractions. Do the work.",
+	name: "Flow Reactor",
+	tagline: "Personalized flow activation. Enter the reactor.",
 	description:
-		"Guided preparation + distraction shield + focused sprints to help you lock in and ship.",
+		"A personalized flow-activation experience tailored to your mental ignition pattern.",
 
 	// Company/Creator Info
 	creator: {
@@ -42,7 +42,7 @@ export const appConfig = {
 			{
 				name: "Starter",
 				price: 12,
-				features: ["Guided Lock-In", "Persistent Timer", "Reflection Journal"],
+				features: ["Flow Reactor Sessions", "Persistent Timer", "Reflection Journal"],
 			},
 			{
 				name: "Studio",

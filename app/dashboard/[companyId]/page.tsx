@@ -24,10 +24,10 @@ export default async function CompanyDashboard({
 			<div className="mx-auto w-full max-w-6xl px-6 py-12 sm:px-10 lg:px-14">
 				<header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 					<div>
-						<div className="text-xs uppercase tracking-[0.3em] text-cyan-200">Lock-In Admin</div>
+						<div className="text-xs uppercase tracking-[0.3em] text-cyan-200">Flow Reactor Admin</div>
 						<h1 className="mt-3 text-4xl font-semibold text-white">{company.title}</h1>
 						<p className="mt-2 max-w-2xl text-base text-slate-300">
-							Welcome back, {user.name}. Review member access and direct your community toward deep focus sessions.
+							Welcome back, {user.name}. Review member access and direct your community toward flow activation sessions.
 						</p>
 					</div>
 					<span className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-slate-200">
@@ -37,20 +37,20 @@ export default async function CompanyDashboard({
 
 				<section className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
 					<Link
-						href="/lock-in"
+						href="/reactor"
 						className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/30"
 					>
 						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Guide</div>
-						<div className="mt-3 text-xl font-semibold text-white">Start Lock-In</div>
-						<p className="mt-2 text-sm text-slate-300">Lead creators through intention, stress, and guardrails.</p>
+						<div className="mt-3 text-xl font-semibold text-white">Start Reactor</div>
+						<p className="mt-2 text-sm text-slate-300">Lead creators through personalized ignition sequences.</p>
 					</Link>
 					<Link
 						href="/focus"
 						className="rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/30"
 					>
-						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Sprint</div>
-						<div className="mt-3 text-xl font-semibold text-white">Resume Focus</div>
-						<p className="mt-2 text-sm text-slate-300">Drop directly into the active lock-in session.</p>
+						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Activate</div>
+						<div className="mt-3 text-xl font-semibold text-white">Resume Flow</div>
+						<p className="mt-2 text-sm text-slate-300">Drop directly into the active reactor session.</p>
 					</Link>
 					<Link
 						href="/logs"
@@ -74,8 +74,8 @@ export default async function CompanyDashboard({
 					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Community Tips</div>
 						<ul className="mt-4 space-y-2 text-sm text-slate-300">
-							<li>Encourage members to capture a Lock-In before co-working calls.</li>
-							<li>Share guardrail best practices to reduce distraction triggers.</li>
+							<li>Encourage members to start a Flow Reactor session before co-working calls.</li>
+							<li>Share ignition sequence best practices to reduce distraction triggers.</li>
 							<li>Use reflections to celebrate specific shipped outcomes.</li>
 						</ul>
 					</div>
@@ -89,7 +89,7 @@ export default async function CompanyDashboard({
 					<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 						<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Access Notes</div>
 						<p className="mt-4 text-sm text-slate-300">
-							Users marked as <span className="font-semibold text-white">admin</span> can manage company level integrations and lock-in experiences.
+							Users marked as <span className="font-semibold text-white">admin</span> can manage company level integrations and Flow Reactor experiences.
 						</p>
 					</div>
 				</section>

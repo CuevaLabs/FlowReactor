@@ -1,4 +1,4 @@
-import { getLogs, type SessionLog } from './lockin-logs';
+import { getLogs, type ReactorSessionLog } from './flow-reactor-logs';
 
 export type RoleThreshold = {
     key: string;
@@ -8,8 +8,8 @@ export type RoleThreshold = {
 };
 
 export const ROLE_THRESHOLDS: RoleThreshold[] = [
-    { key: 'focus-initiate', label: 'Focus Initiate', xp: 0, description: 'Started your Lock-In practice.' },
-    { key: 'deep-worker-i', label: 'Deep Worker I', xp: 250, description: 'Completed multiple focused sprints.' },
+    { key: 'focus-initiate', label: 'Focus Initiate', xp: 0, description: 'Started your Flow Reactor practice.' },
+    { key: 'deep-worker-i', label: 'Deep Worker I', xp: 250, description: 'Completed multiple reactor sessions.' },
     { key: 'deep-worker-ii', label: 'Deep Worker II', xp: 500, description: 'Maintained consistency across weeks.' },
     { key: 'flow-architect', label: 'Flow Architect', xp: 1000, description: 'Leading the community with relentless focus.' },
 ];
@@ -24,7 +24,7 @@ export type ProgressSummary = {
     xpToNext: number;
 };
 
-export function computeProgress(logs: SessionLog[]): ProgressSummary {
+export function computeProgress(logs: ReactorSessionLog[]): ProgressSummary {
     const totalXP = logs.reduce((acc, log) => acc + (log.xpAwarded ?? 0), 0);
     const totalMinutes = logs.reduce((acc, log) => acc + log.lengthMinutes, 0);
     const sessions = logs.length;
@@ -54,7 +54,7 @@ export function getProgressFromStorage(): ProgressSummary {
     return computeProgress(logs);
 }
 
-function calculateStreak(logs: SessionLog[]): number {
+function calculateStreak(logs: ReactorSessionLog[]): number {
     if (logs.length === 0) return 0;
     const uniqueDays = Array.from(new Set(logs.map((log) => formatDay(log.startAt)))).sort((a, b) => (a < b ? 1 : -1));
 

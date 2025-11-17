@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation';
 import {
 	addOrUpdateLog,
 	getLog,
-	type SessionLog,
-} from '@/lib/lockin-logs';
-import { endSession, useFocusSession } from '@/lib/focus-session';
+} from '@/lib/flow-reactor-logs';
+import { endSession, useFlowReactorSession } from '@/lib/flow-reactor-session';
 
 const formatTime = (secs: number) => {
 	const minutes = Math.floor(secs / 60);
@@ -17,7 +16,7 @@ const formatTime = (secs: number) => {
 
 export default function FocusOverlay() {
 	const router = useRouter();
-	const session = useFocusSession();
+	const session = useFlowReactorSession();
 	const [now, setNow] = useState<number>(Date.now());
 	const finishing = useRef<boolean>(false);
 
@@ -39,9 +38,10 @@ export default function FocusOverlay() {
 
 		finishing.current = true;
 		const existing = getLog(session.sessionId);
-		const payload: SessionLog = {
+		const payload = {
 			sessionId: session.sessionId,
 			intakeId: session.intakeId,
+			flowType: session.flowType,
 			target: session.target,
 			startAt: session.startAt,
 			endAt: Date.now(),
@@ -65,9 +65,10 @@ export default function FocusOverlay() {
 	if (!session) return null;
 	const handleEnd = () => {
 		if (!session) return;
-		const payload: SessionLog = {
+		const payload = {
 			sessionId: session.sessionId,
 			intakeId: session.intakeId,
+			flowType: session.flowType,
 			target: session.target,
 			startAt: session.startAt,
 			endAt: Date.now(),
@@ -87,7 +88,7 @@ export default function FocusOverlay() {
 						{formatTime(remaining)}
 					</div>
 					<div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">
-						Active
+						Reactor Active
 					</div>
 				</div>
 				<div className="min-w-0 flex-1">
@@ -95,7 +96,7 @@ export default function FocusOverlay() {
 						{session.target}
 					</div>
 					<div className="text-xs text-slate-400">
-						{session.lengthMinutes} min sprint
+						{session.lengthMinutes} min activation
 					</div>
 				</div>
 				<div className="flex flex-col gap-2">

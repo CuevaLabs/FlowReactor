@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
 	getAllIntakes,
-	type IntakeAnswers,
-} from '@/lib/lockin-intake';
+	type ReactorAnswers,
+} from '@/lib/flow-reactor-intake';
 import {
 	getLogs,
-	type SessionLog,
-} from '@/lib/lockin-logs';
+	type ReactorSessionLog,
+} from '@/lib/flow-reactor-logs';
 import { computeProgress, ROLE_THRESHOLDS } from '@/lib/lockin-progress';
 import {
 	computeFocusVsCommunityRatio,
@@ -19,23 +19,14 @@ import {
 } from '@/lib/community-insights';
 
 type SessionWithIntake = {
-	log: SessionLog;
-	intake: IntakeAnswers | null;
+	log: ReactorSessionLog;
+	intake: ReactorAnswers | null;
 };
 
-const QUESTION_LABELS: Record<string, string> = {
-	q1_mind: 'Top of mind',
-	q2_stress: 'Stressors noted',
-	q3_hour_goal: 'Sprint goal',
-	q4_definition: 'Definition of done',
-	q5_distractions: 'Expected distractions',
-	q6_avoid_plan: 'Protection plan',
-};
-
-export default function LockInDashboard() {
+export default function FlowReactorDashboard() {
 	const router = useRouter();
-	const [intakes, setIntakes] = useState<IntakeAnswers[]>([]);
-	const [logs, setLogs] = useState<SessionLog[]>([]);
+	const [intakes, setIntakes] = useState<ReactorAnswers[]>([]);
+	const [logs, setLogs] = useState<ReactorSessionLog[]>([]);
 	const [baseline, setBaseline] = useState(() => getCommunityBaseline());
 	const [unlockState, setUnlockState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 	const [unlockMessage, setUnlockMessage] = useState<string | null>(null);
@@ -49,7 +40,7 @@ export default function LockInDashboard() {
 		hydrate();
 
 		const onStorage = (event: StorageEvent) => {
-			if (!event.key || event.key.startsWith('lockin:')) hydrate();
+			if (!event.key || event.key.startsWith('flowReactor:')) hydrate();
 		};
 		window.addEventListener('storage', onStorage);
 		return () => window.removeEventListener('storage', onStorage);
@@ -108,7 +99,7 @@ export default function LockInDashboard() {
 			setUnlockState('success');
 			setUnlockMessage(result?.message ?? 'Role synced to Whop');
 		} catch (error) {
-			console.error('[lock-in] role sync error', error);
+			console.error('[flow-reactor] role sync error', error);
 			setUnlockState('error');
 			setUnlockMessage(error instanceof Error ? error.message : 'Unable to sync role');
 		}
@@ -122,17 +113,17 @@ export default function LockInDashboard() {
 						<div className="text-xs uppercase tracking-[0.3em] text-cyan-200">
 							Personal Insights
 						</div>
-						<h1 className="mt-3 text-4xl font-semibold text-white">Lock-In Dashboard</h1>
+						<h1 className="mt-3 text-4xl font-semibold text-white">Flow Reactor Dashboard</h1>
 						<p className="mt-2 max-w-2xl text-base text-slate-300">
-							Review your guided answers, spot repeat patterns, and track the consistency of your focus practice.
+							Review your ignition sequences, spot repeat patterns, and track the consistency of your focus practice.
 						</p>
 					</div>
 					<div className="flex flex-wrap items-center gap-3">
 						<Link
-							href="/lock-in"
+							href="/reactor"
 							className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40"
 						>
-							Start New Intake
+							Start New Session
 						</Link>
 						<Link
 							href="/logs"
@@ -147,7 +138,7 @@ export default function LockInDashboard() {
 				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Total XP</div>
 					<div className="mt-4 text-4xl font-semibold text-white">{totals.totalXP}</div>
-					<p className="mt-2 text-sm text-slate-300">Self-awarded XP across lock-ins.</p>
+					<p className="mt-2 text-sm text-slate-300">Self-awarded XP across reactor sessions.</p>
 				</div>
 				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Deep Work Minutes</div>
@@ -157,12 +148,12 @@ export default function LockInDashboard() {
 				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Streak</div>
 					<div className="mt-4 text-4xl font-semibold text-white">{totals.streakDays}d</div>
-					<p className="mt-2 text-sm text-slate-300">Consecutive days with at least one lock-in.</p>
+					<p className="mt-2 text-sm text-slate-300">Consecutive days with at least one reactor session.</p>
 				</div>
 				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Completion Rate</div>
 					<div className="mt-4 text-4xl font-semibold text-white">{completionRate}%</div>
-					<p className="mt-2 text-sm text-slate-300">Sprint sessions that finished the timer.</p>
+					<p className="mt-2 text-sm text-slate-300">Reactor sessions that finished the timer.</p>
 				</div>
 			</section>
 
@@ -208,9 +199,9 @@ export default function LockInDashboard() {
 
 				<div className="rounded-3xl border border-white/10 bg-white/5 p-6">
 					<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Community Comparison</div>
-					<h2 className="mt-3 text-2xl font-semibold text-white">Lock-In vs Community Time</h2>
+					<h2 className="mt-3 text-2xl font-semibold text-white">Flow Reactor vs Community Time</h2>
 					<p className="mt-2 text-sm text-slate-300">
-						Set how much time you typically spend in community chats. We’ll compare your latest lock-in against it.
+						Set how much time you typically spend in community chats. We'll compare your latest reactor session against it.
 					</p>
 					<div className="mt-6">
 						<label className="text-xs uppercase tracking-[0.3em] text-slate-400" htmlFor="baselineMinutes">
@@ -237,7 +228,7 @@ export default function LockInDashboard() {
 						</div>
 					) : (
 						<div className="mt-6 rounded-3xl border border-white/10 bg-slate-950/60 p-5 text-sm text-slate-300">
-							Start a lock-in to see comparisons here.
+							Start a reactor session to see comparisons here.
 						</div>
 					)}
 				</div>
@@ -247,7 +238,7 @@ export default function LockInDashboard() {
 					<h2 className="text-2xl font-semibold text-white">Guided Intake Archive</h2>
 					{history.length === 0 ? (
 						<div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center text-slate-300">
-							No sessions yet. Start a guided lock-in to seed your insights.
+							No sessions yet. Start a Flow Reactor session to seed your insights.
 						</div>
 					) : (
 						<div className="space-y-5">
@@ -294,8 +285,7 @@ export default function LockInDashboard() {
 
 									<div className="mt-4 grid gap-4 lg:grid-cols-2">
 										{intake ? (
-											Object.entries(QUESTION_LABELS).map(([key, label]) => {
-												const value = intake[key as keyof IntakeAnswers];
+											Object.entries(intake.answers).map(([key, value]) => {
 												if (!value) return null;
 												return (
 													<div
@@ -303,7 +293,7 @@ export default function LockInDashboard() {
 														className="rounded-2xl border border-white/5 bg-white/5 p-4 text-slate-200"
 													>
 														<div className="text-[11px] uppercase tracking-[0.3em] text-slate-500">
-															{label}
+															{key}
 														</div>
 														<p className="mt-2 text-base text-white">{value}</p>
 													</div>

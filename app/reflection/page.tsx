@@ -2,8 +2,8 @@
 
 import { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getLog, addOrUpdateLog } from '@/lib/lockin-logs';
-import { getIntake } from '@/lib/lockin-intake';
+import { getLog, addOrUpdateLog } from '@/lib/flow-reactor-logs';
+import { getIntake } from '@/lib/flow-reactor-intake';
 
 function ReflectionContent() {
     const router = useRouter();
@@ -20,9 +20,9 @@ function ReflectionContent() {
 
     const alignmentScore = useMemo(() => {
         if (!intake || !summary) return undefined;
-        // Naive alignment heuristic: length and shared word count
         try {
-            const goal = (intake.q3_hour_goal || intake.q4_definition || '').toLowerCase();
+            const firstAnswer = Object.values(intake.answers)[0] || '';
+            const goal = firstAnswer.toLowerCase();
             const got = summary.toLowerCase();
             if (!goal || !got) return undefined;
             const goalWords = new Set(goal.split(/[^a-z0-9]+/).filter(Boolean));
@@ -37,7 +37,7 @@ function ReflectionContent() {
 
     const handleSave = () => {
         if (!log) {
-            router.push('/lock-in');
+            router.push('/reactor');
             return;
         }
         addOrUpdateLog({
@@ -64,7 +64,7 @@ function ReflectionContent() {
                 <header className="flex flex-col gap-3 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <div className="text-xs uppercase tracking-[0.3em] text-cyan-200">Integration</div>
-                        <h1 className="mt-3 text-4xl font-semibold text-white">Lock-In Reflection</h1>
+                        <h1 className="mt-3 text-4xl font-semibold text-white">Flow Reactor Reflection</h1>
                         <p className="mt-2 max-w-2xl text-base text-slate-300">
                             Compare your intentions with what actually happened to build pattern awareness.
                         </p>
@@ -80,24 +80,12 @@ function ReflectionContent() {
                     <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-200">
                         <div className="text-xs uppercase tracking-[0.3em] text-slate-400">Your Intent Snapshot</div>
                         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                            {(intake.q3_hour_goal || intake.q4_definition) && (
-                                <div>
-                                    <h3 className="text-sm font-semibold text-white">Sprint Target</h3>
-                                    <p className="mt-1 text-slate-200">{intake.q3_hour_goal || intake.q4_definition}</p>
+                            {Object.entries(intake.answers).slice(0, 3).map(([key, value]) => (
+                                <div key={key}>
+                                    <h3 className="text-sm font-semibold text-white">{key}</h3>
+                                    <p className="mt-1 text-slate-200">{value}</p>
                                 </div>
-                            )}
-                            {intake.q5_distractions && (
-                                <div>
-                                    <h3 className="text-sm font-semibold text-white">Expected Friction</h3>
-                                    <p className="mt-1 text-slate-200">{intake.q5_distractions}</p>
-                                </div>
-                            )}
-                            {intake.q6_avoid_plan && (
-                                <div>
-                                    <h3 className="text-sm font-semibold text-white">Protection Plan</h3>
-                                    <p className="mt-1 text-slate-200">{intake.q6_avoid_plan}</p>
-                                </div>
-                            )}
+                            ))}
                         </div>
                     </section>
                 )}
@@ -141,7 +129,7 @@ function ReflectionContent() {
                     <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-6 shadow-inner shadow-black/40 backdrop-blur">
                         <h2 className="text-lg font-semibold text-white">What actually happened?</h2>
                         <p className="mt-1 text-sm text-slate-400">
-                            Capture the highlights, shipped work, and any key learnings from the sprint.
+                            Capture the highlights, shipped work, and any key learnings from the reactor session.
                         </p>
                         <textarea
                             value={summary}
@@ -155,7 +143,7 @@ function ReflectionContent() {
                         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
                             <h2 className="text-lg font-semibold text-white">What tried to pull you away?</h2>
                             <p className="mt-1 text-sm text-slate-400">
-                                Logging friction builds awareness and resilience for the next lock-in.
+                                Logging friction builds awareness and resilience for the next reactor session.
                             </p>
                             <textarea
                                 value={distractions}
@@ -186,7 +174,7 @@ function ReflectionContent() {
                         onClick={() => router.push('/focus')}
                         className="rounded-full border border-white/20 px-5 py-2 font-semibold text-slate-200 transition hover:border-white/40"
                     >
-                        Back to Focus
+                        Back to Flow
                     </button>
                     <button
                         type="button"

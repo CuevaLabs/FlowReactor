@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { addOrUpdateLog, getLog, type SessionLog } from '@/lib/lockin-logs';
-import { endSession, useFocusSession } from '@/lib/focus-session';
-import { getIntake } from '@/lib/lockin-intake';
+import { addOrUpdateLog, getLog, type ReactorSessionLog } from '@/lib/flow-reactor-logs';
+import { endSession, useFlowReactorSession } from '@/lib/flow-reactor-session';
+import { getIntake } from '@/lib/flow-reactor-intake';
 
 const formatTime = (seconds: number) => {
 	const mins = Math.floor(seconds / 60);
@@ -12,7 +12,7 @@ const formatTime = (seconds: number) => {
 	return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-const computeRemainingSeconds = (session: ReturnType<typeof useFocusSession>, now: number) => {
+const computeRemainingSeconds = (session: ReturnType<typeof useFlowReactorSession>, now: number) => {
 	if (!session) return 0;
 	if (session.paused && typeof session.remaining === 'number') {
 		return Math.max(0, session.remaining);
@@ -22,7 +22,7 @@ const computeRemainingSeconds = (session: ReturnType<typeof useFocusSession>, no
 
 export default function FocusPage() {
 	const router = useRouter();
-	const session = useFocusSession();
+	const session = useFlowReactorSession();
 	const [now, setNow] = useState(() => Date.now());
 	const hasRedirected = useRef(false);
 
@@ -39,7 +39,7 @@ export default function FocusPage() {
 		if (typeof window === 'undefined') return;
 		if (!hasRedirected.current) {
 			hasRedirected.current = true;
-			router.replace('/lock-in');
+			router.replace('/reactor');
 		}
 	}, [session, router]);
 
@@ -51,9 +51,10 @@ export default function FocusPage() {
 		if (secondsRemaining > 0) return;
 
 		const existingLog = getLog(session.sessionId);
-		const payload: SessionLog = {
+		const payload: ReactorSessionLog = {
 			sessionId: session.sessionId,
 			intakeId: session.intakeId,
+			flowType: session.flowType,
 			target: session.target,
 			startAt: session.startAt,
 			endAt: Date.now(),
@@ -79,7 +80,7 @@ export default function FocusPage() {
 		return (
 			<div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#111827] text-slate-200">
 				<div className="text-sm uppercase tracking-[0.3em] text-slate-400">
-					Preparing your sprint...
+					Preparing your reactor...
 				</div>
 			</div>
 		);
@@ -95,9 +96,10 @@ export default function FocusPage() {
 
 	const handleEndEarly = () => {
 		if (!session) return;
-		const payload: SessionLog = {
+		const payload: ReactorSessionLog = {
 			sessionId: session.sessionId,
 			intakeId: session.intakeId,
+			flowType: session.flowType,
 			target: session.target,
 			startAt: session.startAt,
 			endAt: Date.now(),
@@ -122,10 +124,10 @@ export default function FocusPage() {
 			<div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 sm:px-12">
 				<header className="flex flex-col gap-6 pt-4 md:flex-row md:items-start md:justify-between">
 					<div>
-						<div className="text-xs uppercase tracking-[0.35em] text-slate-400">Locked-In Sprint</div>
+						<div className="text-xs uppercase tracking-[0.35em] text-slate-400">Flow Reactor Active</div>
 						<h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl">{session.target}</h1>
 						<p className="mt-3 text-sm text-slate-300">
-							{session.lengthMinutes} minute lock • Ends {endTime}
+							{session.lengthMinutes} minute activation • Ends {endTime}
 						</p>
 					</div>
 					<button
@@ -155,37 +157,25 @@ export default function FocusPage() {
 					{intake && (
 						<div className="grid w-full max-w-4xl gap-6 text-left sm:grid-cols-2">
 							<div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
-								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Focus plan</div>
+								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Flow plan</div>
 								<div className="mt-4 space-y-4 text-sm text-slate-200">
-									<div>
-										<div className="text-slate-400">Focus for this sprint</div>
-										<p className="mt-1 text-base text-white">{intake.q3_hour_goal || intake.q4_definition || '—'}</p>
-									</div>
-									<div>
-										<div className="text-slate-400">What “done” looks like</div>
-										<p className="mt-1 text-white/90">{intake.q4_definition || '—'}</p>
-									</div>
+									{Object.entries(intake.answers).slice(0, 2).map(([key, value]) => (
+										<div key={key}>
+											<div className="text-slate-400">{key}</div>
+											<p className="mt-1 text-base text-white">{value || '—'}</p>
+										</div>
+									))}
 								</div>
 							</div>
 							<div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-lg shadow-black/20">
-								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Mindset & guardrails</div>
+								<div className="text-xs uppercase tracking-[0.3em] text-slate-400">Ignition sequence</div>
 								<div className="mt-4 space-y-4 text-sm text-slate-200">
-									<div>
-										<div className="text-slate-400">Headspace check</div>
-										<p className="mt-1 text-white/90">{intake.q1_mind || '—'}</p>
-									</div>
-									<div>
-										<div className="text-slate-400">What you parked</div>
-										<p className="mt-1 text-white/90">{intake.q2_stress || '—'}</p>
-									</div>
-									<div>
-										<div className="text-slate-400">Likely pulls</div>
-										<p className="mt-1 text-white/90">{intake.q5_distractions || '—'}</p>
-									</div>
-									<div>
-										<div className="text-slate-400">Guardrails you committed to</div>
-										<p className="mt-1 text-white/90">{intake.q6_avoid_plan || '—'}</p>
-									</div>
+									{Object.entries(intake.answers).slice(2).map(([key, value]) => (
+										<div key={key}>
+											<div className="text-slate-400">{key}</div>
+											<p className="mt-1 text-white/90">{value || '—'}</p>
+										</div>
+									))}
 								</div>
 							</div>
 						</div>

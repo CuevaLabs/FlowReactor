@@ -4,8 +4,8 @@ import FocusOverlay from "@/components/focus/FocusOverlay";
 import FocusShield from "@/components/focus/FocusShield";
 
 export const metadata: Metadata = {
-	title: "Lock-In",
-	description: "Guide your mind. Block distractions. Do the work.",
+	title: "Flow Reactor",
+	description: "Personalized flow activation. Enter the reactor.",
 };
 
 export default function RootLayout({
