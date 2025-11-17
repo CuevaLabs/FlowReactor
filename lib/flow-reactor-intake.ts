@@ -1,6 +1,7 @@
 // lib/flow-reactor-intake.ts
 
 import { FlowType } from './flow-reactor-types';
+import { readJSON, writeJSON } from './safe-storage';
 
 export type ReactorAnswers = {
   id: string;
@@ -33,25 +34,14 @@ export function getIntake(id: string): ReactorAnswers | null {
 }
 
 export function getAllIntakes(): ReactorAnswers[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(KEY);
-    const parsed = raw ? (JSON.parse(raw) as ReactorAnswers[]) : [];
-    memoryIntakes = parsed;
-    return parsed;
-  } catch {
-    return memoryIntakes;
-  }
+  const stored = readJSON<ReactorAnswers[]>(KEY) ?? [];
+  memoryIntakes = stored;
+  return stored;
 }
 
 function setAllIntakes(items: ReactorAnswers[]) {
-  if (typeof window === 'undefined') return;
   memoryIntakes = items;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(items));
-  } catch {
-    // ignore storage errors
-  }
+  writeJSON(KEY, items);
 }
 
 function randomId(): string {
@@ -61,4 +51,3 @@ function randomId(): string {
   }
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
-

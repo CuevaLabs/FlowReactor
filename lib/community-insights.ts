@@ -1,3 +1,5 @@
+import { readJSON, writeJSON } from './safe-storage';
+
 type CommunityMetrics = {
     baselineMinutes: number;
     lastUpdatedAt: number;
@@ -11,16 +13,9 @@ const DEFAULT_BASELINE: CommunityMetrics = {
 };
 
 export function getCommunityBaseline(): CommunityMetrics {
-    if (typeof window === 'undefined') return DEFAULT_BASELINE;
-    try {
-        const raw = window.localStorage.getItem(KEY);
-        if (!raw) return DEFAULT_BASELINE;
-        const parsed = JSON.parse(raw) as CommunityMetrics;
-        if (!parsed || typeof parsed.baselineMinutes !== 'number') return DEFAULT_BASELINE;
-        return parsed;
-    } catch {
-        return DEFAULT_BASELINE;
-    }
+    const stored = readJSON<CommunityMetrics>(KEY);
+    if (!stored || typeof stored.baselineMinutes !== 'number') return DEFAULT_BASELINE;
+    return stored;
 }
 
 export function saveCommunityBaseline(minutes: number): CommunityMetrics {
@@ -28,13 +23,7 @@ export function saveCommunityBaseline(minutes: number): CommunityMetrics {
         baselineMinutes: Math.max(1, Math.round(minutes)),
         lastUpdatedAt: Date.now(),
     };
-    if (typeof window !== 'undefined') {
-        try {
-            window.localStorage.setItem(KEY, JSON.stringify(value));
-        } catch {
-            // ignore storage errors
-        }
-    }
+    writeJSON(KEY, value);
     return value;
 }
 

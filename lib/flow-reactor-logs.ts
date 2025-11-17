@@ -1,6 +1,7 @@
 // lib/flow-reactor-logs.ts
 
 import { FlowType } from './flow-reactor-types';
+import { readJSON, writeJSON } from './safe-storage';
 
 export type ReactorSessionLog = {
   sessionId: string;
@@ -41,24 +42,12 @@ export function getLog(sessionId: string): ReactorSessionLog | null {
 }
 
 export function getLogs(): ReactorSessionLog[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(KEY);
-    const parsed = raw ? (JSON.parse(raw) as ReactorSessionLog[]) : [];
-    memoryLogs = parsed;
-    return parsed;
-  } catch {
-    return memoryLogs;
-  }
+  const stored = readJSON<ReactorSessionLog[]>(KEY) ?? [];
+  memoryLogs = stored;
+  return stored;
 }
 
 function setLogs(items: ReactorSessionLog[]) {
-  if (typeof window === 'undefined') return;
   memoryLogs = items;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(items));
-  } catch {
-    // ignore storage errors
-  }
+  writeJSON(KEY, items);
 }
-

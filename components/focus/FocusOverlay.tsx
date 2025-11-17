@@ -6,7 +6,8 @@ import {
 	addOrUpdateLog,
 	getLog,
 } from '@/lib/flow-reactor-logs';
-import { endSession, useFlowReactorSession } from '@/lib/flow-reactor-session';
+import type { ReactorSessionLog } from '@/lib/flow-reactor-logs';
+import { endSession, getSessionRemainingSeconds, useFlowReactorSession } from '@/lib/flow-reactor-session';
 
 const formatTime = (secs: number) => {
 	const minutes = Math.floor(secs / 60);
@@ -25,25 +26,22 @@ export default function FocusOverlay() {
 		return () => clearInterval(tick);
 	}, []);
 
-	const remaining = useMemo(() => {
-		if (!session) return 0;
-		if (session.paused) {
-			if (typeof session.remaining === 'number') return Math.max(0, session.remaining);
-		}
-		return Math.max(0, Math.floor((session.endAt - now) / 1000));
-	}, [session, now]);
+	const remaining = useMemo(
+		() => (session ? getSessionRemainingSeconds(session, now) : 0),
+		[session, now]
+	);
 
 	useEffect(() => {
 		if (!session || session.paused || remaining > 0 || finishing.current) return;
 
 		finishing.current = true;
 		const existing = getLog(session.sessionId);
-		const payload = {
-			sessionId: session.sessionId,
-			intakeId: session.intakeId,
-			flowType: session.flowType,
-			target: session.target,
-			startAt: session.startAt,
+			const payload: ReactorSessionLog = {
+				sessionId: session.sessionId,
+				intakeId: session.intakeId,
+				flowType: session.flowType,
+				target: session.target,
+				startAt: session.startAt,
 			endAt: Date.now(),
 			lengthMinutes: session.lengthMinutes,
 			completed: true,
@@ -65,11 +63,11 @@ export default function FocusOverlay() {
 	if (!session) return null;
 	const handleEnd = () => {
 		if (!session) return;
-		const payload = {
-			sessionId: session.sessionId,
-			intakeId: session.intakeId,
-			flowType: session.flowType,
-			target: session.target,
+			const payload: ReactorSessionLog = {
+				sessionId: session.sessionId,
+				intakeId: session.intakeId,
+				flowType: session.flowType,
+				target: session.target,
 			startAt: session.startAt,
 			endAt: Date.now(),
 			lengthMinutes: session.lengthMinutes,

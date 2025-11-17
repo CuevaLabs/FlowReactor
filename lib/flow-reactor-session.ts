@@ -2,17 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { FlowType } from './flow-reactor-types';
+import { readJSON, writeJSON } from './safe-storage';
 
-export type FlowReactorSession = {
-  sessionId: string;
-  target: string;
-  startAt: number;
-  endAt: number;
-  paused: boolean;
-  remaining?: number;
-  lengthMinutes: number;
-  intakeId?: string;
-  flowType?: FlowType;
+type StoredFlowReactorSession = {
+	sessionId: string;
+	target: string;
+	startAt: number;
+	lengthMinutes: number;
+	paused: boolean;
+	remaining?: number;
+	intakeId?: string;
+	flowType?: FlowType;
+};
+
+export type FlowReactorSession = StoredFlowReactorSession & {
+	endAt: number;
 };
 
 const KEY = 'flowReactorSession';
@@ -22,128 +26,155 @@ const listeners = new Set<() => void>();
 let storageListenerAttached = false;
 
 function notifyAll() {
-  listeners.forEach((listener) => {
-    try {
-      listener();
-    } catch {
-      // ignore listener errors
-    }
-  });
+	listeners.forEach((listener) => {
+		try {
+			listener();
+		} catch {
+			// ignore listener errors
+		}
+	});
 }
 
 function ensureStorageListener() {
-  if (storageListenerAttached || typeof window === 'undefined') return;
-  storageListenerAttached = true;
-  window.addEventListener('storage', (event) => {
-    if (event.key && event.key !== KEY) return;
-    memorySession = readFromStorage();
-    notifyAll();
-  });
+	if (storageListenerAttached || typeof window === 'undefined') return;
+	storageListenerAttached = true;
+	window.addEventListener('storage', (event) => {
+		if (event.key && event.key !== KEY) return;
+		memorySession = readFromStorage();
+		notifyAll();
+	});
+}
+
+function hydrateSession(data: StoredFlowReactorSession | null): FlowReactorSession | null {
+	if (!data) return null;
+	return {
+		...data,
+		endAt: data.startAt + data.lengthMinutes * 60 * 1000,
+	};
+}
+
+function dehydrateSession(session: FlowReactorSession | null): StoredFlowReactorSession | null {
+	if (!session) return null;
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { endAt, ...rest } = session;
+	return rest;
 }
 
 function readFromStorage(): FlowReactorSession | null {
-  if (typeof window === 'undefined') return memorySession;
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    const parsed = raw ? (JSON.parse(raw) as FlowReactorSession) : null;
-    memorySession = parsed;
-    return parsed;
-  } catch {
-    return memorySession;
-  }
+	const parsed = readJSON<StoredFlowReactorSession>(KEY);
+	const hydrated = hydrateSession(parsed ?? null);
+	memorySession = hydrated;
+	return hydrated;
 }
 
 export function getSession(): FlowReactorSession | null {
-  if (typeof window === 'undefined') return null;
-  return readFromStorage();
+	if (typeof window === 'undefined') return memorySession;
+	return readFromStorage();
 }
 
-export function setSession(session: FlowReactorSession | null) {
-  if (typeof window === 'undefined') return;
-  memorySession = session;
-  try {
-    if (session) localStorage.setItem(KEY, JSON.stringify(session));
-    else localStorage.removeItem(KEY);
-  } catch {
-    // ignore quota or access errors
-  }
-  notifyAll();
+function persistSession(session: StoredFlowReactorSession | null) {
+	memorySession = hydrateSession(session);
+	writeJSON(KEY, session);
+	notifyAll();
 }
 
 export function startSession(
-  target: string,
-  lengthMinutes: number,
-  intakeId?: string,
-  flowType?: FlowType
+	target: string,
+	lengthMinutes: number,
+	intakeId?: string,
+	flowType?: FlowType
 ) {
-  const now = Date.now();
-  const session: FlowReactorSession = {
-    sessionId: cryptoRandomId(),
-    target,
-    lengthMinutes,
-    startAt: now,
-    endAt: now + lengthMinutes * 60 * 1000,
-    paused: false,
-    intakeId,
-    flowType,
-  };
-  setSession(session);
+	const now = Date.now();
+	const session: StoredFlowReactorSession = {
+		sessionId: cryptoRandomId(),
+		target,
+		lengthMinutes,
+		startAt: now,
+		paused: false,
+		intakeId,
+		flowType,
+	};
+	persistSession(session);
 }
 
 export function endSession() {
-  setSession(null);
+	persistSession(null);
 }
 
 export function pauseSession() {
-  const s = getSession();
-  if (!s || s.paused) return;
-  const remaining = Math.max(0, Math.floor((s.endAt - Date.now()) / 1000));
-  setSession({ ...s, paused: true, remaining });
+	const session = getSession();
+	if (!session || session.paused) return;
+	const remainingSeconds = getSessionRemainingSeconds(session);
+	const stored = {
+		...dehydrateSession(session)!,
+		paused: true,
+		remaining: remainingSeconds,
+	};
+	persistSession(stored);
 }
 
 export function resumeSession() {
-  const s = getSession();
-  if (!s || !s.paused) return;
-  const endAt = Date.now() + (s.remaining ?? 0) * 1000;
-  const { remaining, ...rest } = s;
-  setSession({ ...rest, paused: false, endAt });
+	const session = getSession();
+	if (!session || !session.paused) return;
+	const remainingSeconds =
+		typeof session.remaining === 'number'
+			? session.remaining
+			: getSessionRemainingSeconds(session);
+
+	const durationSeconds = session.lengthMinutes * 60;
+	const elapsedSeconds = Math.max(0, durationSeconds - remainingSeconds);
+	const newStartAt = Date.now() - elapsedSeconds * 1000;
+
+	const stored: StoredFlowReactorSession = {
+		...dehydrateSession(session)!,
+		startAt: newStartAt,
+		paused: false,
+	};
+	delete stored.remaining;
+	persistSession(stored);
 }
 
 export function subscribeSession(callback: () => void) {
-  if (typeof window === 'undefined') return () => {};
-  listeners.add(callback);
-  ensureStorageListener();
-  try {
-    callback();
-  } catch {
-    // ignore subscriber errors
-  }
-  return () => {
-    listeners.delete(callback);
-  };
+	if (typeof window === 'undefined') return () => {};
+	listeners.add(callback);
+	ensureStorageListener();
+	try {
+		callback();
+	} catch {
+		// ignore subscriber errors
+	}
+	return () => {
+		listeners.delete(callback);
+	};
 }
 
 export function useFlowReactorSession(): FlowReactorSession | null {
-  const [session, setSessionState] = useState<FlowReactorSession | null>(() => {
-    if (typeof window === 'undefined') return memorySession;
-    return readFromStorage();
-  });
+	const [session, setSessionState] = useState<FlowReactorSession | null>(() => {
+		if (typeof window === 'undefined') return memorySession;
+		return readFromStorage();
+	});
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const sync = () => setSessionState(readFromStorage());
-    const unsubscribe = subscribeSession(sync);
-    return unsubscribe;
-  }, []);
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const sync = () => setSessionState(readFromStorage());
+		const unsubscribe = subscribeSession(sync);
+		return unsubscribe;
+	}, []);
 
-  return session;
+	return session;
+}
+
+export function getSessionRemainingSeconds(session: FlowReactorSession, now = Date.now()) {
+	if (session.paused && typeof session.remaining === 'number') {
+		return Math.max(0, session.remaining);
+	}
+	return Math.max(0, Math.floor((session.endAt - now) / 1000));
 }
 
 export function cryptoRandomId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    // @ts-ignore
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+	if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+		// @ts-ignore
+		return crypto.randomUUID();
+	}
+	return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
-

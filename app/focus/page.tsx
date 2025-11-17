@@ -3,21 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { addOrUpdateLog, getLog, type ReactorSessionLog } from '@/lib/flow-reactor-logs';
-import { endSession, useFlowReactorSession } from '@/lib/flow-reactor-session';
+import { endSession, getSessionRemainingSeconds, useFlowReactorSession } from '@/lib/flow-reactor-session';
 import { getIntake } from '@/lib/flow-reactor-intake';
 
 const formatTime = (seconds: number) => {
 	const mins = Math.floor(seconds / 60);
 	const secs = seconds % 60;
 	return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
-
-const computeRemainingSeconds = (session: ReturnType<typeof useFlowReactorSession>, now: number) => {
-	if (!session) return 0;
-	if (session.paused && typeof session.remaining === 'number') {
-		return Math.max(0, session.remaining);
-	}
-	return Math.max(0, Math.floor((session.endAt - now) / 1000));
 };
 
 export default function FocusPage() {
@@ -43,7 +35,10 @@ export default function FocusPage() {
 		}
 	}, [session, router]);
 
-	const secondsRemaining = useMemo(() => computeRemainingSeconds(session, now), [session, now]);
+	const secondsRemaining = useMemo(
+		() => (session ? getSessionRemainingSeconds(session, now) : 0),
+		[session, now]
+	);
 	const initialTotal = session ? session.lengthMinutes * 60 : 0;
 
 	useEffect(() => {

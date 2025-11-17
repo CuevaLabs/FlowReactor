@@ -1,3 +1,5 @@
+import { readJSON, writeJSON } from './safe-storage';
+
 export type IntakeAnswers = {
     id: string;
     createdAt: number;
@@ -31,25 +33,14 @@ export function getIntake(id: string): IntakeAnswers | null {
 }
 
 export function getAllIntakes(): IntakeAnswers[] {
-    if (typeof window === 'undefined') return [];
-    try {
-        const raw = localStorage.getItem(KEY);
-        const parsed = raw ? (JSON.parse(raw) as IntakeAnswers[]) : [];
-        memoryIntakes = parsed;
-        return parsed;
-    } catch {
-        return memoryIntakes;
-    }
+    const stored = readJSON<IntakeAnswers[]>(KEY) ?? [];
+    memoryIntakes = stored;
+    return stored;
 }
 
 function setAllIntakes(items: IntakeAnswers[]) {
-    if (typeof window === 'undefined') return;
     memoryIntakes = items;
-    try {
-        localStorage.setItem(KEY, JSON.stringify(items));
-    } catch {
-        // ignore storage errors
-    }
+    writeJSON(KEY, items);
 }
 
 function randomId(): string {

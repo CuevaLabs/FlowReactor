@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveIntake, type IntakeAnswers } from '@/lib/lockin-intake';
 import { startSession, useFocusSession } from '@/lib/focus-session';
+import { readJSON, readString, writeJSON, writeString } from '@/lib/safe-storage';
 
 type StepKey = keyof Pick<
 	IntakeAnswers,
@@ -65,13 +66,9 @@ export default function LockInPage() {
 	const [cursor, setCursor] = useState<number>(0);
 	const [answers, setAnswers] = useState<Record<StepKey, string>>(defaultAnswers);
 	const [length, setLength] = useState<number>(() => {
-		if (typeof window === 'undefined') return 25;
-		try {
-			const stored = window.localStorage.getItem('focusSessionLength');
-			return stored ? Number.parseInt(stored, 10) || 25 : 25;
-		} catch {
-			return 25;
-		}
+		const stored = readString('focusSessionLength');
+		const parsed = stored ? Number.parseInt(stored, 10) : Number.NaN;
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : 25;
 	});
 	const activeSession = useFocusSession();
 	const [draftLoaded, setDraftLoaded] = useState<boolean>(false);
@@ -84,37 +81,20 @@ export default function LockInPage() {
 	const progress = useMemo(() => Math.round(((cursor + 1) / totalStages) * 100), [cursor, totalStages]);
 
 	useEffect(() => {
-		if (typeof window === 'undefined') return;
-
-		try {
-			const draftRaw = window.localStorage.getItem(STORAGE_KEY);
-			if (draftRaw) {
-				const parsed = JSON.parse(draftRaw) as Record<StepKey, string>;
-				setAnswers({ ...defaultAnswers, ...parsed });
-			}
-		} catch {
-			// ignore corrupted draft or blocked storage
-		} finally {
-			setDraftLoaded(true);
+		const draft = readJSON<Record<StepKey, string>>(STORAGE_KEY);
+		if (draft) {
+			setAnswers({ ...defaultAnswers, ...draft });
 		}
+		setDraftLoaded(true);
 	}, []);
 
 	useEffect(() => {
-		if (typeof window === 'undefined') return;
-		try {
-			window.localStorage.setItem('focusSessionLength', String(length));
-		} catch {
-			// ignore storage errors
-		}
+		writeString('focusSessionLength', String(length));
 	}, [length]);
 
 	useEffect(() => {
-		if (!draftLoaded || typeof window === 'undefined') return;
-		try {
-			window.localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
-		} catch {
-			// storage might be blocked; ignore
-		}
+		if (!draftLoaded) return;
+		writeJSON(STORAGE_KEY, answers);
 	}, [answers, draftLoaded]);
 
 	const handleContinue = () => {
@@ -148,13 +128,7 @@ export default function LockInPage() {
 					: 'Focused work';
 
 		startSession(target, length, record.id);
-		if (typeof window !== 'undefined') {
-			try {
-				window.localStorage.removeItem(STORAGE_KEY);
-			} catch {
-				// ignore storage errors
-			}
-		}
+		writeJSON(STORAGE_KEY, null);
 		router.push('/focus');
 	};
 

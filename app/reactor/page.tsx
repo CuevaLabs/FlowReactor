@@ -6,6 +6,7 @@ import { FlowType, FLOW_TYPE_OPTIONS, getQuestionSetForFlowType } from '@/lib/fl
 import { saveIntake } from '@/lib/flow-reactor-intake';
 import { getUserFlowType } from '@/lib/flow-type-storage';
 import { startSession, useFlowReactorSession } from '@/lib/flow-reactor-session';
+import { readJSON, readString, writeJSON, writeString } from '@/lib/safe-storage';
 
 const STORAGE_KEY = 'flowReactor:intake:draft';
 
@@ -15,13 +16,9 @@ export default function ReactorPage() {
   const [cursor, setCursor] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [length, setLength] = useState<number>(() => {
-    if (typeof window === 'undefined') return 25;
-    try {
-      const stored = window.localStorage.getItem('flowReactorSessionLength');
-      return stored ? Number.parseInt(stored, 10) || 25 : 25;
-    } catch {
-      return 25;
-    }
+    const stored = readString('flowReactorSessionLength');
+    const parsed = stored ? Number.parseInt(stored, 10) : Number.NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 25;
   });
   const activeSession = useFlowReactorSession();
   const [draftLoaded, setDraftLoaded] = useState<boolean>(false);
@@ -45,36 +42,20 @@ export default function ReactorPage() {
   const progress = useMemo(() => Math.round(((cursor + 1) / totalStages) * 100), [cursor, totalStages]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const draftRaw = window.localStorage.getItem(STORAGE_KEY);
-      if (draftRaw) {
-        const parsed = JSON.parse(draftRaw) as Record<string, string>;
-        setAnswers({ ...parsed });
-      }
-    } catch {
-      // ignore corrupted draft
-    } finally {
-      setDraftLoaded(true);
+    const draft = readJSON<Record<string, string>>(STORAGE_KEY);
+    if (draft) {
+      setAnswers({ ...draft });
     }
+    setDraftLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('flowReactorSessionLength', String(length));
-    } catch {
-      // ignore storage errors
-    }
+    writeString('flowReactorSessionLength', String(length));
   }, [length]);
 
   useEffect(() => {
-    if (!draftLoaded || typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
-    } catch {
-      // storage might be blocked
-    }
+    if (!draftLoaded) return;
+    writeJSON(STORAGE_KEY, answers);
   }, [answers, draftLoaded]);
 
   const handleContinue = () => {
@@ -102,13 +83,7 @@ export default function ReactorPage() {
         : 'Flow activation';
 
     startSession(target, length, record.id, flowType);
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.removeItem(STORAGE_KEY);
-      } catch {
-        // ignore storage errors
-      }
-    }
+    writeJSON(STORAGE_KEY, null);
     router.push('/focus');
   };
 
@@ -281,4 +256,3 @@ export default function ReactorPage() {
     </div>
   );
 }
-

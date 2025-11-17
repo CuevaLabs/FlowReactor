@@ -1,3 +1,5 @@
+import { readJSON, writeJSON } from './safe-storage';
+
 export type SessionLog = {
     sessionId: string;
     intakeId?: string;
@@ -37,23 +39,12 @@ export function getLog(sessionId: string): SessionLog | null {
 }
 
 export function getLogs(): SessionLog[] {
-    if (typeof window === 'undefined') return [];
-    try {
-        const raw = localStorage.getItem(KEY);
-        const parsed = raw ? (JSON.parse(raw) as SessionLog[]) : [];
-        memoryLogs = parsed;
-        return parsed;
-    } catch {
-        return memoryLogs;
-    }
+    const stored = readJSON<SessionLog[]>(KEY) ?? [];
+    memoryLogs = stored;
+    return stored;
 }
 
 function setLogs(items: SessionLog[]) {
-    if (typeof window === 'undefined') return;
     memoryLogs = items;
-    try {
-        localStorage.setItem(KEY, JSON.stringify(items));
-    } catch {
-        // ignore storage errors
-    }
+    writeJSON(KEY, items);
 }
