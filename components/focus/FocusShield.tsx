@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
 	endSession as endFocusSession,
 	useFocusSession,
@@ -33,6 +34,7 @@ export default function FocusShield() {
 	const flowSession = useFlowReactorSession();
 	const lockSession = useFocusSession();
 	const activeSession = flowSession ?? lockSession;
+	const pathname = usePathname();
 
 	const [toast, setToast] = useState<string | null>(null);
 	const [holdProgress, setHoldProgress] = useState(0);
@@ -142,7 +144,7 @@ export default function FocusShield() {
 		return `Emergency exit • ${target.slice(0, 42)}`;
 	}, [activeSession]);
 
-	if (!activeSession) {
+	if (!activeSession || pathname === "/focus") {
 		return null;
 	}
 
@@ -203,4 +205,3 @@ export default function FocusShield() {
 		</>
 	);
 }
-

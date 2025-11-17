@@ -61,7 +61,7 @@ const defaultAnswers: Record<StepKey, string> = {
 	q6_avoid_plan: '',
 };
 
-export default function LockInPage() {
+export default function FlowReactorPage() {
 	const router = useRouter();
 	const [cursor, setCursor] = useState<number>(0);
 	const [answers, setAnswers] = useState<Record<StepKey, string>>(defaultAnswers);
