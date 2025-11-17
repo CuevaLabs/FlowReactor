@@ -68,7 +68,7 @@ export const FLOW_QUESTION_SETS: Record<FlowType, FlowQuestionSet> = {
         key: 'q2_ignore',
         title: 'What can you safely ignore during this session?',
         description: 'Drop the noise in here so it stops looping.',
-        placeholder: 'List thoughts you're shelving...',
+        placeholder: "List thoughts you're shelving...",
       },
       {
         key: 'q3_focus',
@@ -91,7 +91,7 @@ export const FLOW_QUESTION_SETS: Record<FlowType, FlowQuestionSet> = {
         key: 'q2_next_step',
         title: "What's the next step right after that?",
         description: 'Build momentum with a clear sequence.',
-        placeholder: 'Then I'll...',
+        placeholder: "Then I'll...",
       },
       {
         key: 'q3_progress',
@@ -143,7 +143,7 @@ export const FLOW_QUESTION_SETS: Record<FlowType, FlowQuestionSet> = {
         key: 'q3_start',
         title: 'Which step will you start with?',
         description: 'Choose your entry point.',
-        placeholder: 'I'll begin with...',
+        placeholder: "I'll begin with...",
       },
     ],
   },
@@ -166,7 +166,7 @@ export const FLOW_QUESTION_SETS: Record<FlowType, FlowQuestionSet> = {
         key: 'q3_first_thing',
         title: "What's the first thing you'll do once distractions are blocked?",
         description: 'Define your immediate action once guardrails are up.',
-        placeholder: 'I'll immediately...',
+        placeholder: "I'll immediately...",
       },
     ],
   },
@@ -175,4 +175,3 @@ export const FLOW_QUESTION_SETS: Record<FlowType, FlowQuestionSet> = {
 export function getQuestionSetForFlowType(flowType: FlowType): FlowQuestionSet {
   return FLOW_QUESTION_SETS[flowType];
 }
-
