@@ -139,10 +139,7 @@ export function subscribeSession(callback: () => void) {
 }
 
 export function useFocusSession(): FocusSession | null {
-	const [session, setSessionState] = useState<FocusSession | null>(() => {
-		if (typeof window === 'undefined') return memorySession;
-		return readFromStorage();
-	});
+	const [session, setSessionState] = useState<FocusSession | null>(() => memorySession);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;

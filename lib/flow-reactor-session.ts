@@ -149,10 +149,7 @@ export function subscribeSession(callback: () => void) {
 }
 
 export function useFlowReactorSession(): FlowReactorSession | null {
-	const [session, setSessionState] = useState<FlowReactorSession | null>(() => {
-		if (typeof window === 'undefined') return memorySession;
-		return readFromStorage();
-	});
+	const [session, setSessionState] = useState<FlowReactorSession | null>(() => memorySession);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
