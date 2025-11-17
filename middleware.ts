@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const ALLOWED_PATHS = new Set(["/", "/favicon.ico"]);
+const ALLOWED_PREFIXES = ["/experiences/"];
 
 export function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
@@ -13,7 +14,7 @@ export function middleware(request: NextRequest) {
 		return NextResponse.next();
 	}
 
-	if (ALLOWED_PATHS.has(pathname)) {
+	if (ALLOWED_PATHS.has(pathname) || ALLOWED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
 		return NextResponse.next();
 	}
 
