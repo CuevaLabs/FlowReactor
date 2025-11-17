@@ -1,5 +1,4 @@
-'use server';
-
+import "server-only";
 import { WhopServerSdk } from "@whop/api";
 
 const requireEnvVar = (name: string): string => {
